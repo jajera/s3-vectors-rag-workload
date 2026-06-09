@@ -11,7 +11,7 @@ export default defineConfig({
   },
   integrations: [
     starlight({
-      title: 'Amazon S3 Vectors',
+      title: 'Amazon S3 Vectors RAG',
       favicon: '/favicon.svg',
       description:
         'Learn Amazon S3 Vectors by example — a cloud-native RAG briefing app with Terraform, Lambda, and Bedrock.',
@@ -34,8 +34,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image',
-            content:
-              'https://jajera.github.io/s3-vectors-rag-workload/og-image.png',
+            content: 'https://jajera.github.io/s3-vectors-rag-workload/og-image.png',
           },
         },
         {
@@ -53,10 +52,7 @@ export default defineConfig({
         {
           label: 'Prerequisites',
           collapsed: false,
-          items: [
-            { slug: 'prerequisites' },
-            { slug: 'prerequisites/bedrock-access' },
-          ],
+          items: [{ slug: 'prerequisites' }, { slug: 'prerequisites/bedrock-access' }],
         },
         {
           label: 'S3 Vectors',
