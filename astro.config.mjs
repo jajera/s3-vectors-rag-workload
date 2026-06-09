@@ -45,6 +45,13 @@ export default defineConfig({
               'Amazon S3 Vectors RAG demo — vector search, Bedrock embeddings, and serverless architecture',
           },
         },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:image',
+            content: 'https://jajera.github.io/s3-vectors-rag-workload/og-image.png',
+          },
+        },
       ],
       sidebar: [
         { label: 'Introduction', link: '/' },
