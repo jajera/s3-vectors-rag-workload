@@ -1,0 +1,25 @@
+
+export default new Map([
+["src/content/docs/deployment/cognito-users.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Fcognito-users.mdx&astroContentModuleFlag=true")],
+["src/content/docs/deployment/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/deployment/terraform-apply.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Fterraform-apply.mdx&astroContentModuleFlag=true")],
+["src/content/docs/deployment/web-ui.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Fweb-ui.mdx&astroContentModuleFlag=true")],
+["src/content/docs/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/overview.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Foverview.mdx&astroContentModuleFlag=true")],
+["src/content/docs/prerequisites/bedrock-access.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fprerequisites%2Fbedrock-access.mdx&astroContentModuleFlag=true")],
+["src/content/docs/prerequisites/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fprerequisites%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/rag-pipeline/embeddings.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Frag-pipeline%2Fembeddings.mdx&astroContentModuleFlag=true")],
+["src/content/docs/rag-pipeline/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Frag-pipeline%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/rag-pipeline/ingest.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Frag-pipeline%2Fingest.mdx&astroContentModuleFlag=true")],
+["src/content/docs/rag-pipeline/query.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Frag-pipeline%2Fquery.mdx&astroContentModuleFlag=true")],
+["src/content/docs/rag-pipeline/scoring.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Frag-pipeline%2Fscoring.mdx&astroContentModuleFlag=true")],
+["src/content/docs/reference.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Freference.mdx&astroContentModuleFlag=true")],
+["src/content/docs/s3-vectors/iam-permissions.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fs3-vectors%2Fiam-permissions.mdx&astroContentModuleFlag=true")],
+["src/content/docs/s3-vectors/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fs3-vectors%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/s3-vectors/terraform-resources.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fs3-vectors%2Fterraform-resources.mdx&astroContentModuleFlag=true")],
+["src/content/docs/s3-vectors/vector-operations.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fs3-vectors%2Fvector-operations.mdx&astroContentModuleFlag=true")],
+["src/content/docs/teardown.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fteardown.mdx&astroContentModuleFlag=true")],
+["src/content/docs/troubleshooting/bedrock-errors.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Ftroubleshooting%2Fbedrock-errors.mdx&astroContentModuleFlag=true")],
+["src/content/docs/troubleshooting/common-issues.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Ftroubleshooting%2Fcommon-issues.mdx&astroContentModuleFlag=true")],
+["src/content/docs/troubleshooting/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Ftroubleshooting%2Findex.mdx&astroContentModuleFlag=true")]]);
+		

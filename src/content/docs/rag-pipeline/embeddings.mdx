@@ -1,0 +1,170 @@
+---
+title: Embedding Strategy
+description: How text becomes vectors — model choice, document preparation, and the single-chunk approach.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+This page explains how the pipeline converts text into vectors using <Tooltip term="titan-v2" label="Amazon Titan Embeddings V2" /> — covering model selection, document preparation, truncation handling, and why each article becomes a single vector rather than multiple chunks.
+
+## Model choice
+
+The project uses <Tooltip term="embedding-model" label="Amazon Titan Text Embeddings V2" /> for all embedding operations.
+
+<table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Model ID</td>
+      <td><code>amazon.titan-embed-text-v2:0</code></td>
+    </tr>
+    <tr>
+      <td>Output dimensions</td>
+      <td>1024 (float32)</td>
+    </tr>
+    <tr>
+      <td>Max input tokens</td>
+      <td>8192</td>
+    </tr>
+    <tr>
+      <td>Distance metric</td>
+      <td><Tooltip term="cosine" label="Cosine similarity" /></td>
+    </tr>
+    <tr>
+      <td>Access</td>
+      <td>Amazon <Tooltip term="bedrock" label="Bedrock" /> runtime API</td>
+    </tr>
+  </tbody>
+</table>
+
+The same model and dimension are used for both ingest (article bodies) and query (user questions). This consistency is essential — vectors from different models live in incompatible spaces and produce meaningless similarity scores when compared.
+
+## Document preparation
+
+Before an article reaches the embedding model, it passes through three preparation steps in `rag/fetch.py`:
+
+1. **HTML stripping** — RSS content often includes HTML markup. The pipeline extracts plain text using a parser, then removes any remaining tags with a regex fallback.
+
+2. **Unicode normalization** — Non-ASCII characters are decomposed (NFKD) and stripped to pure ASCII. This prevents encoding issues and reduces token waste on special characters.
+
+3. **Truncation** — Text is capped at 8000 characters on a word boundary. A marker is appended to indicate truncation occurred.
+
+```python title="rag/fetch.py"
+MAX_BODY_CHARS = 8000
+
+def _truncate_body(text: str) -> str:
+    if len(text) <= MAX_BODY_CHARS:
+        return text
+    trimmed = text[:MAX_BODY_CHARS].rsplit(" ", 1)[0]
+    return trimmed + "\n\n[Truncated for demo embedding size.]\n"
+```
+
+<Aside type="note">
+The 8000-character limit is a practical safety margin below Titan V2's 8192-token maximum. Characters and tokens aren't 1:1, but for ASCII English text after normalization the ratio is close enough that 8000 characters stays safely within the token budget.
+</Aside>
+
+## Single-chunk rationale
+
+Many RAG systems split long documents into multiple chunks (paragraphs or fixed-size windows) and store each chunk as a separate vector. This project takes a simpler approach: **one article = one vector**.
+
+Why this works here:
+
+- **Short source documents** — AWS news articles and blog posts are typically 200–2000 words after HTML stripping. Most fit comfortably within the 8000-character budget without truncation.
+- **Atomic retrieval** — Each result maps to exactly one article. No need to reassemble chunks or deduplicate overlapping windows.
+- **Simpler metadata** — The vector key encodes `chunk-000` as a fixed suffix, leaving room for future multi-chunk support without a schema change.
+- **Demo clarity** — Fewer moving parts make the architecture easier to understand and debug.
+
+<Aside type="tip">
+For production systems with longer documents (PDFs, technical manuals), chunking with overlap is usually necessary to stay within token limits and improve retrieval precision.
+</Aside>
+
+## The embedding function
+
+Both the ingest and query Lambdas call <Tooltip term="bedrock" label="Bedrock" /> to generate embeddings. The ingest version includes retry logic for throttling:
+
+```python title="rag/ingest.py"
+def _bedrock_embed(client, model_id, text):
+    last_error = None
+    for attempt in range(6):
+        try:
+            response = client.invoke_model(
+                modelId=model_id,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps({"inputText": text}),
+            )
+            payload = json.loads(response["body"].read())
+            embedding = payload.get("embedding")
+            if not isinstance(embedding, list):
+                raise RuntimeError(
+                    "Bedrock response missing 'embedding' array"
+                )
+            return embedding
+        except ClientError as exc:
+            code = exc.response["Error"].get("Code", "")
+            if code not in {
+                "ThrottlingException",
+                "ServiceUnavailableException",
+            }:
+                raise
+            last_error = exc
+            time.sleep(min(2**attempt, 30))
+    raise RuntimeError(f"Throttled after retries: {last_error}")
+```
+
+Key details:
+
+- The request body contains only `inputText` — Titan V2 returns a 1024-dimensional float32 array in the `embedding` field.
+- Exponential backoff (capped at 30 seconds) handles Bedrock throttling gracefully.
+- Up to 6 attempts gives roughly 60 seconds of retry budget before failing.
+
+The query Lambda uses the same API call but without retries — a single user question is unlikely to be throttled:
+
+```python title="rag/query.py"
+def _bedrock_embed(client, model_id, text):
+    response = client.invoke_model(
+        modelId=model_id,
+        contentType="application/json",
+        accept="application/json",
+        body=json.dumps({"inputText": text}),
+    )
+    payload = json.loads(response["body"].read())
+    return payload["embedding"]
+```
+
+## Ingest vs query usage
+
+Both paths use the same model ID (`amazon.titan-embed-text-v2:0`) configured via the `EMBEDDING_MODEL_ID` environment variable. This ensures vectors land in the same semantic space:
+
+<table>
+  <thead>
+    <tr>
+      <th>Path</th>
+      <th>Input</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ingest</td>
+      <td>Cleaned article body (up to 8000 chars)</td>
+      <td>Store vector in <Tooltip term="s3-vectors" label="S3 Vectors" /> index</td>
+    </tr>
+    <tr>
+      <td>Query</td>
+      <td>User's natural language question</td>
+      <td>Search for similar stored vectors</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="caution">
+If you change the embedding model, you must re-ingest the entire corpus. Vectors from different models are not comparable — similarity scores become meaningless.
+</Aside>
+

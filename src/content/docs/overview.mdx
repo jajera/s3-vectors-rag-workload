@@ -1,0 +1,130 @@
+---
+title: Overview
+description: What Amazon S3 Vectors is, the demo architecture, and what this walkthrough covers.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+## What is Amazon S3 Vectors?
+
+<Tooltip term="s3-vectors" label="Amazon S3 Vectors" /> is a purpose-built vector storage capability within Amazon S3. It lets you store, index, and query high-dimensional vector embeddings without provisioning or managing a separate vector database.
+
+Your entire vector search infrastructure becomes two Terraform resources:
+
+```hcl
+resource "aws_s3vectors_vector_bucket" "this" {
+  vector_bucket_name = "my-vectors"
+}
+
+resource "aws_s3vectors_index" "this" {
+  vector_bucket_name = aws_s3vectors_vector_bucket.this.vector_bucket_name
+  index_name         = "embeddings"
+  dimension          = 1024
+  distance_metric    = "cosine"
+  data_type          = "float32"
+}
+```
+
+That's it. No clusters, no capacity planning, no connection pooling.
+
+## The demo application
+
+This walkthrough documents a working application: an **AWS announcements briefing** system that:
+
+1. Fetches AWS What's New and AWS News Blog RSS feeds daily
+2. Embeds each article into a 1024-dimensional vector via <Tooltip term="titan-v2" label="Titan Embeddings V2" />
+3. Stores vectors in S3 Vectors with metadata (title, URL, date, feed)
+4. Serves a web UI where authenticated users ask questions
+5. Searches vectors for relevant articles, then generates grounded answers via Claude
+
+## Architecture
+
+![Architecture layers — showing the full stack from browser through API Gateway, Lambda, S3 Vectors, and Bedrock](/s3-vectors-rag-workload/architecture-layers.png)
+
+## What Terraform manages
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>Purpose</th>
+      <th>File</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>aws_s3vectors_vector_bucket</code></td>
+      <td>Vector storage container</td>
+      <td><code>s3_vectors.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_s3vectors_index</code></td>
+      <td>1024-dim cosine index</td>
+      <td><code>s3_vectors.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_s3_bucket</code></td>
+      <td>Source document storage</td>
+      <td><code>s3.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_lambda_function</code> (×2)</td>
+      <td>Ingest + Query handlers</td>
+      <td><code>lambda_ingest.tf</code>, <code>lambda_query.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_apigatewayv2_api</code></td>
+      <td>HTTP API with JWT auth</td>
+      <td><code>api_gateway.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_cognito_user_pool</code></td>
+      <td>User authentication</td>
+      <td><code>cognito.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_amplify_app</code></td>
+      <td>SPA hosting</td>
+      <td><code>amplify.tf</code></td>
+    </tr>
+    <tr>
+      <td><code>aws_cloudwatch_event_rule</code></td>
+      <td>Daily ingest schedule</td>
+      <td><code>lambda_ingest.tf</code></td>
+    </tr>
+  </tbody>
+</table>
+
+## What this walkthrough covers
+
+<table>
+  <thead>
+    <tr>
+      <th>Section</th>
+      <th>Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S3 Vectors</td>
+      <td>Concepts, Terraform resources, API operations, IAM permissions</td>
+    </tr>
+    <tr>
+      <td>RAG Pipeline</td>
+      <td>Ingest flow, query flow, embedding strategy, similarity scoring</td>
+    </tr>
+    <tr>
+      <td>Deployment</td>
+      <td>Prerequisites, terraform apply, Cognito users, web UI</td>
+    </tr>
+    <tr>
+      <td>Troubleshooting</td>
+      <td>Bedrock errors, common issues, debugging</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="note">
+This walkthrough documents <a href="https://github.com/jajera/terraform-aws-s3-vectors-rag-demo">terraform-aws-s3-vectors-rag-demo</a>. Clone that repo to follow along with deployment steps.
+</Aside>

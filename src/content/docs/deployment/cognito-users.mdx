@@ -1,0 +1,204 @@
+---
+title: Cognito Users
+description: Managing authentication — admin user creation and manual user management.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+<Tooltip term="cognito" label="Amazon Cognito" /> handles user authentication for this project. The user pool uses email as the username, issues JWT tokens, and integrates with <Tooltip term="api-gateway" label="API Gateway" /> to authorize requests. This page covers the auto-created admin user, manual user management, and how group membership controls API access.
+
+## Authentication flow
+
+When a user signs in, the flow works like this:
+
+1. User authenticates against the Cognito user pool from the web UI
+2. Cognito returns a JWT (ID token and access token)
+3. The web UI includes the token in API requests
+4. <Tooltip term="api-gateway" label="API Gateway" /> validates the JWT using the Cognito authorizer
+5. If valid, the request is forwarded to the appropriate <Tooltip term="lambda" label="Lambda" /> function
+6. Group claims in the token determine endpoint access (admin vs regular user)
+
+## Auto-created admin
+
+When you set `cognito_admin_email` in your <Tooltip term="terraform" label="Terraform" /> variables, an admin user is automatically created during `terraform apply`.
+
+```hcl title="terraform.tfvars"
+cognito_admin_email = "admin@example.com"
+```
+
+During deployment, Terraform:
+
+1. Creates the user in the Cognito user pool with email verified
+2. Adds the user to the **admin** group
+3. Sends a temporary password to the email address
+
+<Aside type="note">
+The admin user must change their temporary password on first sign-in. Cognito enforces this with a <code>FORCE_CHANGE_PASSWORD</code> status until the user completes the challenge.
+</Aside>
+
+## Groups and access control
+
+The project creates a single Cognito group called **admin**. Group membership determines which API endpoints a user can call.
+
+<table>
+  <thead>
+    <tr>
+      <th>Group</th>
+      <th>Endpoint access</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>admin</code></td>
+      <td><code>POST /ingest</code> and <code>POST /query</code></td>
+      <td>Can trigger ingestion and query the system</td>
+    </tr>
+    <tr>
+      <td>(no group)</td>
+      <td><code>POST /query</code> only</td>
+      <td>Can query but cannot trigger ingestion</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="tip">
+The admin group claim is included in the JWT token as <code>cognito:groups</code>. API Gateway checks this claim to authorize the <code>POST /ingest</code> route.
+</Aside>
+
+## Password requirements
+
+The Cognito user pool enforces the following password policy:
+
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+- At least one special character
+
+## Manual user creation
+
+First, retrieve the user pool ID from Terraform outputs:
+
+```bash
+POOL_ID="$(terraform output -raw cognito_user_pool_id)"
+```
+
+### Create a user
+
+```bash
+aws cognito-idp admin-create-user \
+  --user-pool-id "${POOL_ID}" \
+  --username "user@example.com" \
+  --user-attributes Name=email,Value=user@example.com Name=email_verified,Value=true \
+  --message-action SUPPRESS
+```
+
+The `--message-action SUPPRESS` flag prevents Cognito from sending a welcome email. Remove it if you want the user to receive their temporary password by email.
+
+### Set a permanent password
+
+```bash
+aws cognito-idp admin-set-user-password \
+  --user-pool-id "${POOL_ID}" \
+  --username "user@example.com" \
+  --password "YourSecurePass12!" \
+  --permanent
+```
+
+<Aside type="caution">
+The <code>--permanent</code> flag skips the forced password change on first login. Without it, the user must complete the <code>NEW_PASSWORD_REQUIRED</code> challenge before they can use the account.
+</Aside>
+
+### Add a user to the admin group
+
+```bash
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id "${POOL_ID}" \
+  --username "user@example.com" \
+  --group-name "admin"
+```
+
+After adding a user to the admin group, they gain access to `POST /ingest` on their next sign-in (when a fresh token is issued).
+
+### Remove a user from the admin group
+
+```bash
+aws cognito-idp admin-remove-user-from-group \
+  --user-pool-id "${POOL_ID}" \
+  --username "user@example.com" \
+  --group-name "admin"
+```
+
+## Listing users
+
+### List all users in the pool
+
+```bash
+aws cognito-idp list-users \
+  --user-pool-id "${POOL_ID}" \
+  --output table
+```
+
+### List users in the admin group
+
+```bash
+aws cognito-idp list-users-in-group \
+  --user-pool-id "${POOL_ID}" \
+  --group-name "admin" \
+  --output table
+```
+
+## Deleting a user
+
+```bash
+aws cognito-idp admin-delete-user \
+  --user-pool-id "${POOL_ID}" \
+  --username "user@example.com"
+```
+
+<Aside type="caution">
+User deletion is permanent and immediate. The user loses access to all API endpoints and their tokens are invalidated.
+</Aside>
+
+## Quick reference
+
+<table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>CLI command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Create user</td>
+      <td><code>aws cognito-idp admin-create-user</code></td>
+    </tr>
+    <tr>
+      <td>Set password</td>
+      <td><code>aws cognito-idp admin-set-user-password</code></td>
+    </tr>
+    <tr>
+      <td>Add to group</td>
+      <td><code>aws cognito-idp admin-add-user-to-group</code></td>
+    </tr>
+    <tr>
+      <td>Remove from group</td>
+      <td><code>aws cognito-idp admin-remove-user-from-group</code></td>
+    </tr>
+    <tr>
+      <td>List users</td>
+      <td><code>aws cognito-idp list-users</code></td>
+    </tr>
+    <tr>
+      <td>List group members</td>
+      <td><code>aws cognito-idp list-users-in-group</code></td>
+    </tr>
+    <tr>
+      <td>Delete user</td>
+      <td><code>aws cognito-idp admin-delete-user</code></td>
+    </tr>
+  </tbody>
+</table>

@@ -1,0 +1,72 @@
+---
+title: S3 Vectors Concepts
+description: Core concepts of Amazon S3 Vectors — vector buckets, indexes, dimensions, and distance metrics.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+## What is S3 Vectors?
+
+<Tooltip term="s3-vectors" label="Amazon S3 Vectors" /> is a purpose-built vector storage capability within S3. It enables similarity search over embeddings without managing a separate vector database (no Pinecone, no pgvector, no OpenSearch).
+
+## Core concepts
+
+![S3 Vectors core concepts — vector buckets, indexes, dimensions, and distance metrics](/s3-vectors-rag-workload/s3-vectors-core-concepts.png)
+
+### Vector Bucket
+
+A <Tooltip term="vector-bucket" label="Vector Bucket" /> is a specialized S3 bucket type that hosts vector indexes. Think of it as the "database" that contains your "tables" (indexes).
+
+- Created via `aws_s3vectors_vector_bucket` Terraform resource
+- Named with a globally unique name (this demo uses a random prefix)
+- Contains one or more vector indexes
+
+### Vector Index
+
+A <Tooltip term="vector-index" label="Vector Index" /> is a named index within a vector bucket. It defines how vectors are stored and searched:
+
+<table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value in this demo</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Dimension</strong></td>
+      <td>1024</td>
+      <td>Number of floats per vector. Must match embedding model output exactly.</td>
+    </tr>
+    <tr>
+      <td><strong>Distance metric</strong></td>
+      <td>cosine</td>
+      <td>Measures angle between vectors. Best for text embeddings (direction matters more than magnitude).</td>
+    </tr>
+    <tr>
+      <td><strong>Data type</strong></td>
+      <td>float32</td>
+      <td>32-bit floating point precision for each value.</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="caution">
+Dimension is set at index creation and <strong>cannot be changed</strong>. If you switch embedding models, you need a new index.
+</Aside>
+
+### Vectors
+
+Each stored vector consists of:
+
+- **Key** — A unique identifier (e.g., `article-a1b2c3d4-chunk-000`)
+- **Data** — The float array (1024 values for this demo)
+- **Metadata** — Arbitrary key-value pairs (title, URL, date, feed, etc.)
+
+Metadata is returned with search results, eliminating the need for a separate database lookup.
+
+## How it compares
+
+![S3 Vectors compared to traditional vector databases — infrastructure, provisioning, auth, scaling, and pricing](/s3-vectors-rag-workload/s3-vectors-comparison.png)

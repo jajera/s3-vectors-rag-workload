@@ -1,0 +1,288 @@
+---
+title: Ingest Pipeline
+description: How the ingest Lambda fetches RSS, embeds articles, and stores vectors in S3 Vectors.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+The ingest pipeline fetches AWS announcements from public RSS feeds, generates
+<Tooltip term="embedding" label="embeddings" /> using <Tooltip term="titan-v2" label="Titan Embeddings V2" />,
+and stores them in <Tooltip term="s3-vectors" label="S3 Vectors" /> for similarity search.
+Each run processes the full corpus and upserts vectors — making it safe to re-run at any time.
+
+![Ingestion pipeline — RSS fetch, HTML stripping, embedding, and PutVectors flow](/s3-vectors-rag-workload/ingestion-pipeline.png)
+
+## Trigger sources
+
+The ingest <Tooltip term="lambda" label="Lambda" /> can be invoked three ways:
+
+<table>
+  <thead>
+    <tr>
+      <th>Trigger</th>
+      <th>Source value</th>
+      <th>When it fires</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule</td>
+      <td><code>eventbridge</code></td>
+      <td>Daily at 06:00 UTC (configurable via <code>ingest_schedule_expression</code>)</td>
+    </tr>
+    <tr>
+      <td>API Gateway endpoint</td>
+      <td><code>api</code></td>
+      <td>Admin sends <code>POST /ingest</code> (requires Cognito JWT in admin group)</td>
+    </tr>
+    <tr>
+      <td>Bootstrap (<code>terraform apply</code>)</td>
+      <td><code>terraform</code></td>
+      <td>Runs once during initial deployment via <code>aws_lambda_invocation</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="note">
+The bootstrap invocation uses a <code>lifecycle.replace_triggered_by</code> block tied to the Lambda source hash — it re-runs automatically whenever the function code changes.
+</Aside>
+
+## Step-by-step flow
+
+The ingest pipeline runs through these stages:
+
+1. **Fetch RSS feeds** — download articles from AWS What's New and AWS News Blog
+2. **Strip HTML** — extract plain text, normalize unicode, deduplicate by URL
+3. **Truncate** — limit each article body to 8,000 characters
+4. **Upload to S3** — store each article as a `.txt` file in the source bucket
+5. **Embed** — generate a 1024-dimensional vector for each article via Bedrock
+6. **PutVectors** — store vectors with metadata in S3 Vectors
+7. **Write marker** — record `.last-ingest` with timestamp and count
+
+## RSS fetching
+
+The `fetch_articles()` function downloads from two feeds:
+
+```python title="rag/fetch.py"
+FEEDS = (
+    ("aws-whats-new", "https://aws.amazon.com/about-aws/whats-new/recent/feed/", 100),
+    ("aws-news-blog", "https://aws.amazon.com/blogs/aws/feed/", 20),
+)
+```
+
+Each feed has a per-source limit matching what the public endpoints expose. Articles are deduplicated by URL across feeds and a minimum of 5 articles is required for a successful run.
+
+The HTTP fetch includes retry logic:
+
+```python title="rag/fetch.py"
+def _fetch_bytes(url: str, retries: int = 2) -> bytes:
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urlopen(request, timeout=60) as response:
+                return response.read()
+        except (HTTPError, URLError, TimeoutError) as exc:
+            last_error = exc
+            if attempt + 1 < retries:
+                time.sleep(2)
+    raise RuntimeError(f"Failed to fetch {url}: {last_error}") from last_error
+```
+
+## HTML stripping and text preparation
+
+Raw RSS content is HTML. The pipeline strips tags, unescapes entities, normalizes unicode to ASCII, and truncates to `MAX_BODY_CHARS` (8,000):
+
+```python title="rag/fetch.py"
+def _strip_html(value: str) -> str:
+    if not value:
+        return ""
+    unescaped = html.unescape(value)
+    parser = _HTMLTextExtractor()
+    parser.feed(unescaped)
+    parser.close()
+    text = parser.get_text() or re.sub(r"<[^>]+>", " ", unescaped)
+    return re.sub(r"\s+", " ", text).strip()
+
+def _truncate_body(text: str) -> str:
+    if len(text) <= MAX_BODY_CHARS:
+        return text
+    trimmed = text[:MAX_BODY_CHARS].rsplit(" ", 1)[0]
+    return trimmed + "\n\n[Truncated for demo embedding size.]\n"
+```
+
+<Aside type="tip">
+Truncation splits on the last space before 8,000 characters to avoid cutting words mid-token. This keeps the embedding input clean.
+</Aside>
+
+## Embedding with Bedrock
+
+Each article body is embedded using <Tooltip term="embedding-model" label="Titan Embeddings V2" /> via the Bedrock runtime API. The function includes exponential backoff for throttling:
+
+```python title="rag/ingest.py"
+def _bedrock_embed(client, model_id: str, text: str) -> list[float]:
+    last_error = None
+    for attempt in range(6):
+        try:
+            response = client.invoke_model(
+                modelId=model_id,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps({"inputText": text}),
+            )
+            payload = json.loads(response["body"].read())
+            return payload["embedding"]
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code not in {"ThrottlingException", "ServiceUnavailableException"}:
+                raise
+            last_error = exc
+            time.sleep(min(2**attempt, 30))
+    raise RuntimeError(f"Bedrock embed throttled after retries: {last_error}")
+```
+
+Key details:
+- Up to **6 retry attempts** with exponential backoff (1s, 2s, 4s, 8s, 16s, 30s max)
+- Only retries `ThrottlingException` and `ServiceUnavailableException`
+- All other errors raise immediately
+- A 150ms sleep between articles avoids hitting Bedrock rate limits
+
+## Storing vectors with PutVectors
+
+After embedding, all vectors are written to S3 Vectors in a single <Tooltip term="put-vectors" label="PutVectors" /> call:
+
+```python title="rag/ingest.py"
+vectors.append(
+    {
+        "key": f"article-{article.url_hash}-chunk-000",
+        "data": {"float32": embedding},
+        "metadata": {
+            "source": article.filename,
+            "title": article.title,
+            "url": article.url,
+            "published": article.published,
+            "feed": article.feed,
+            "chunk": "0",
+        },
+    }
+)
+
+_put_vectors(s3vectors, config, vectors)
+```
+
+The vector key uses the URL hash, so re-ingesting the same article upserts rather than duplicates.
+
+## Vector metadata
+
+Each stored vector carries metadata used during query and scoring:
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Example</th>
+      <th>Used for</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>source</code></td>
+      <td><code>aws-whats-new-a1b2c3d4.txt</code></td>
+      <td>Loading full document from S3 at query time</td>
+    </tr>
+    <tr>
+      <td><code>title</code></td>
+      <td><code>Amazon S3 Vectors is now GA</code></td>
+      <td>Display in search results and LLM context</td>
+    </tr>
+    <tr>
+      <td><code>url</code></td>
+      <td><code>https://aws.amazon.com/...</code></td>
+      <td>Citation links in generated answers</td>
+    </tr>
+    <tr>
+      <td><code>published</code></td>
+      <td><code>2025-06-01T12:00:00Z</code></td>
+      <td>Recency scoring (newer articles rank higher)</td>
+    </tr>
+    <tr>
+      <td><code>feed</code></td>
+      <td><code>aws-whats-new</code></td>
+      <td>Source attribution</td>
+    </tr>
+    <tr>
+      <td><code>chunk</code></td>
+      <td><code>0</code></td>
+      <td>Always "0" — single-chunk strategy (one vector per article)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Last-ingest marker
+
+After all vectors are stored, the pipeline writes a JSON marker to S3:
+
+```python title="rag/ingest.py"
+marker = {
+    "ingested_at": fetched_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "article_count": len(items),
+}
+s3.put_object(
+    Bucket=config.source_bucket,
+    Key=config.last_ingest_key,
+    Body=json.dumps(marker).encode("utf-8"),
+    ContentType="application/json",
+)
+```
+
+This marker is read by the status endpoint to report corpus freshness.
+
+## Error handling and retries
+
+<table>
+  <thead>
+    <tr>
+      <th>Failure point</th>
+      <th>Behavior</th>
+      <th>Max retries</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RSS feed HTTP errors</td>
+      <td>Retry with 2s backoff, then raise</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>Too few articles fetched</td>
+      <td>Raise <code>RuntimeError</code> (need &ge; 5)</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>Bedrock throttling</td>
+      <td>Exponential backoff (1s–30s cap)</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>Bedrock non-throttle errors</td>
+      <td>Raise immediately (no retry)</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>S3/S3 Vectors write failures</td>
+      <td>Raise (Lambda timeout is 480s)</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="caution">
+The Lambda timeout is set to 480 seconds (8 minutes). If Bedrock throttling is severe, the function may time out before processing all articles. Check CloudWatch logs at <code>/aws/lambda/&lt;project&gt;-&lt;env&gt;-ingest</code> for timeout indicators.
+</Aside>
+
+## Related pages
+
+- [Embeddings strategy](/s3-vectors-rag-workload/rag-pipeline/embeddings/) — why single-chunk and Titan V2
+- [Query pipeline](/s3-vectors-rag-workload/rag-pipeline/query/) — how stored vectors are searched
+- [Scoring](/s3-vectors-rag-workload/rag-pipeline/scoring/) — how recency metadata affects ranking

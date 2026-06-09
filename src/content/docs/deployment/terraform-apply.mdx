@@ -1,0 +1,223 @@
+---
+title: Terraform Apply
+description: Step-by-step deployment of the RAG infrastructure.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+This page walks through the complete deployment process — from cloning the source repo to verifying your running application. The entire stack deploys in a single <Tooltip term="terraform" label="Terraform" /> apply that takes around 3–5 minutes.
+
+## Clone the source repo
+
+Start by cloning the infrastructure repository:
+
+```bash title="Terminal"
+git clone https://github.com/jajera/terraform-aws-s3-vectors-rag-demo.git
+cd terraform-aws-s3-vectors-rag-demo
+```
+
+## Configure terraform.tfvars
+
+Copy the example variables file and edit it with your values:
+
+```bash title="Terminal"
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Open `terraform.tfvars` in your editor and set the required variables:
+
+```hcl title="terraform.tfvars"
+project              = "s3vec-rag"
+environment          = "dev"
+aws_region           = "us-east-1"
+cognito_admin_email  = "you@example.com"
+
+rss_feeds = [
+  "https://aws.amazon.com/about-aws/whats-new/recent-announcements/feed/",
+]
+```
+
+<Aside type="note">
+The <code>cognito_admin_email</code> receives a temporary password after deployment. Use a real email address you can access.
+</Aside>
+
+### Variable reference
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Required</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>project</code></td>
+      <td>Yes</td>
+      <td>Name prefix for all AWS resources (keep short, lowercase, no spaces)</td>
+    </tr>
+    <tr>
+      <td><code>environment</code></td>
+      <td>Yes</td>
+      <td>Deployment environment label (e.g., <code>dev</code>, <code>staging</code>, <code>prod</code>)</td>
+    </tr>
+    <tr>
+      <td><code>aws_region</code></td>
+      <td>Yes</td>
+      <td>AWS region — must support both <Tooltip term="s3-vectors" label="S3 Vectors" /> and <Tooltip term="bedrock" label="Bedrock" /></td>
+    </tr>
+    <tr>
+      <td><code>cognito_admin_email</code></td>
+      <td>Yes</td>
+      <td>Email for the auto-created admin user in <Tooltip term="cognito" label="Cognito" /></td>
+    </tr>
+    <tr>
+      <td><code>rss_feeds</code></td>
+      <td>Yes</td>
+      <td>List of RSS feed URLs to ingest into the vector store</td>
+    </tr>
+    <tr>
+      <td><code>ingest_schedule_expression</code></td>
+      <td>No</td>
+      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule expression (default: <code>cron(0 6 * * ? *)</code> — daily at 06:00 UTC)</td>
+    </tr>
+    <tr>
+      <td><code>embedding_model_id</code></td>
+      <td>No</td>
+      <td><Tooltip term="embedding-model" label="Embedding model" /> ID (default: <code>amazon.titan-embed-text-v2:0</code>)</td>
+    </tr>
+    <tr>
+      <td><code>inference_profile_id</code></td>
+      <td>No</td>
+      <td>Bedrock inference profile for the LLM (default: Claude via cross-region profile)</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="caution">
+Choose a region that supports both S3 Vectors and the Bedrock models you need. As of mid-2025, <code>us-east-1</code> and <code>us-west-2</code> are recommended.
+</Aside>
+
+## Initialize Terraform
+
+Download the required providers and modules:
+
+```bash title="Terminal"
+terraform init
+```
+
+You should see output confirming the AWS provider was installed:
+
+```text
+Initializing provider plugins...
+- Installing hashicorp/aws v6.x.x...
+- Installing hashicorp/random v3.x.x...
+- Installing hashicorp/null v3.x.x...
+
+Terraform has been successfully initialized!
+```
+
+## Preview the plan
+
+Before applying, review what Terraform will create:
+
+```bash title="Terminal"
+terraform plan
+```
+
+This shows the full list of resources to be provisioned without making any changes. Expect around 40–50 resources including <Tooltip term="lambda" label="Lambda" /> functions, <Tooltip term="api-gateway" label="API Gateway" /> routes, IAM roles, and the <Tooltip term="amplify" label="Amplify" /> app.
+
+<Aside type="tip">
+Review the plan output to confirm your region and project name are correct before applying.
+</Aside>
+
+## Apply the configuration
+
+Deploy the entire stack:
+
+```bash title="Terminal"
+terraform apply
+```
+
+Type `yes` when prompted to confirm. The deployment takes approximately 3–5 minutes.
+
+### What happens during apply
+
+Terraform provisions resources in this sequence:
+
+1. **Foundation** — IAM roles, S3 buckets, <Tooltip term="vector-bucket" label="vector bucket" />, and <Tooltip term="vector-index" label="vector index" />
+2. **Compute** — Lambda functions for ingest and query, with Python dependencies packaged as layers
+3. **API layer** — API Gateway HTTP API with JWT authorizer and CORS configuration
+4. **Auth** — Cognito user pool, app client, admin user, and user groups
+5. **Frontend** — Amplify app with the React SPA built and deployed
+6. **Scheduling** — EventBridge rule for daily ingest cron
+7. **Bootstrap** — A `null_resource` provisioner triggers the initial ingest, embedding ~120 articles into the vector store
+
+<Aside type="note">
+The bootstrap ingest runs automatically as part of the apply. You will have searchable content immediately after deployment completes.
+</Aside>
+
+## Verify outputs
+
+Once the apply finishes, retrieve the key outputs:
+
+```bash title="Terminal"
+terraform output
+```
+
+This prints all configured outputs. To get individual values:
+
+```bash title="Terminal"
+terraform output -raw app_url
+terraform output -raw api_endpoint
+terraform output -raw cognito_user_pool_id
+```
+
+### Output reference
+
+<table>
+  <thead>
+    <tr>
+      <th>Output</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>app_url</code></td>
+      <td>Amplify HTTPS URL for the web UI — open this in your browser</td>
+    </tr>
+    <tr>
+      <td><code>api_endpoint</code></td>
+      <td>API Gateway base URL for the query and ingest endpoints</td>
+    </tr>
+    <tr>
+      <td><code>cognito_user_pool_id</code></td>
+      <td>Cognito user pool ID (needed for CLI user management)</td>
+    </tr>
+    <tr>
+      <td><code>cognito_client_id</code></td>
+      <td>SPA client ID used by the frontend for authentication</td>
+    </tr>
+    <tr>
+      <td><code>vector_bucket_name</code></td>
+      <td>The S3 Vectors bucket name (useful for debugging)</td>
+    </tr>
+    <tr>
+      <td><code>ingest_function_name</code></td>
+      <td>Ingest Lambda function name (for manual invocations or log inspection)</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="tip">
+Copy the <code>app_url</code> and open it in your browser. You will need the Cognito credentials (sent to your admin email) to log in. See the <a href="/s3-vectors-rag-workload/deployment/cognito-users/">Cognito Users</a> page for details.
+</Aside>
+
+## Next steps
+
+- [Set up additional users](/s3-vectors-rag-workload/deployment/cognito-users/) — create readers and manage groups
+- [Explore the web UI](/s3-vectors-rag-workload/deployment/web-ui/) — understand the frontend and redeployment
+- [Tear down the stack](/s3-vectors-rag-workload/teardown/) — clean up all resources when done
