@@ -1,0 +1,100 @@
+---
+title: Vector Operations
+description: PutVectors, QueryVectors, and GetVectors — the S3 Vectors API in action.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+## API operations
+
+Five API calls power this demo. The <Tooltip term="lambda" label="Ingest Lambda" /> writes and maintains vectors; the Query Lambda searches them. Both share <code>GetVectors</code> and <code>ListIndexes</code>.
+
+![S3 Vectors API — which Lambda calls PutVectors, QueryVectors, GetVectors, DeleteVectors, and ListIndexes](/s3-vectors-rag-workload/s3-vectors-api-operations.png)
+
+## PutVectors
+
+Store one or more vectors with metadata:
+
+```python
+s3vectors.put_vectors(
+    vectorBucketName=config.vector_bucket,
+    indexName=config.vector_index,
+    vectors=[
+        {
+            "key": "article-a1b2c3d4-chunk-000",
+            "data": {"float32": embedding},  # 1024 floats
+            "metadata": {
+                "source": "aws-whats-new-a1b2c3d4.txt",
+                "title": "Amazon S3 Vectors is now GA",
+                "url": "https://aws.amazon.com/...",
+                "published": "2025-06-01T12:00:00Z",
+                "feed": "aws-whats-new",
+                "chunk": "0",
+            },
+        }
+    ],
+)
+```
+
+Key points:
+- **key** must be unique within the index (used for upsert and retrieval)
+- **data** must match the index dimension exactly (1024 floats)
+- **metadata** is arbitrary — store whatever you'll need at search time
+
+## QueryVectors
+
+Find the most similar vectors to a query:
+
+```python
+response = s3vectors.query_vectors(
+    vectorBucketName=config.vector_bucket,
+    indexName=config.vector_index,
+    queryVector={"float32": query_embedding},
+    topK=15,
+    returnMetadata=True,
+)
+
+for vector in response.get("vectors", []):
+    key = vector["key"]
+    similarity = vector.get("similarity", 0.0)
+    metadata = vector.get("metadata", {})
+    title = metadata.get("title", "")
+```
+
+Key points:
+- **queryVector** is the embedded question (same model, same dimension)
+- **topK** controls how many results to return
+- **returnMetadata=True** includes stored metadata in results
+- Results are sorted by similarity score (highest first)
+
+<Aside type="tip">
+Over-fetch (request more than you need) and rerank application-side. This demo requests 3x the desired results and applies recency scoring before selecting the final set.
+</Aside>
+
+## GetVectors
+
+Retrieve specific vectors by their keys:
+
+```python
+response = s3vectors.get_vectors(
+    vectorBucketName=config.vector_bucket,
+    indexName=config.vector_index,
+    keys=["article-a1b2c3d4-chunk-000"],
+    returnMetadata=True,
+)
+```
+
+## Boto3 client
+
+The S3 Vectors service has its own boto3 client:
+
+```python
+import boto3
+
+s3vectors = boto3.client("s3vectors", region_name="ap-southeast-2")
+```
+
+<Aside type="note">
+This is <code>s3vectors</code> — a separate service client from <code>s3</code>. Don't confuse the two.
+</Aside>

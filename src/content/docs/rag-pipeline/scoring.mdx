@@ -1,0 +1,191 @@
+---
+title: Similarity Scoring
+description: Two-stage retrieval — vector search plus application-level reranking with recency decay.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+The <Tooltip term="query-vectors" label="QueryVectors" /> API returns results ranked by cosine similarity alone. That works for many use cases, but a news briefing app needs to balance relevance with freshness. This demo applies a two-stage scoring strategy: over-fetch from S3 Vectors, then rerank application-side using a weighted formula.
+
+## Scoring formula
+
+Every candidate gets a final score composed of two signals:
+
+```text
+final_score = (0.8 × similarity) + (0.2 × recency)
+```
+
+- **similarity** — the <Tooltip term="cosine" label="cosine similarity" /> score returned by S3 Vectors (0 to 1)
+- **recency** — an exponential decay score based on days since publication (0 to 1)
+
+The 80/20 weighting keeps semantic relevance as the primary signal while giving a meaningful boost to newer content.
+
+## Similarity score
+
+The similarity component comes directly from the <Tooltip term="query-vectors" label="QueryVectors" /> response. S3 Vectors computes cosine similarity between the query embedding and each stored vector, returning values between 0 (unrelated) and 1 (identical direction).
+
+```python title="rag/query.py"
+def _vector_similarity_score(vector: dict) -> float:
+    if isinstance(vector.get("similarity"), (int, float)):
+        return float(vector["similarity"])
+    if isinstance(vector.get("score"), (int, float)):
+        return float(vector["score"])
+    if isinstance(vector.get("distance"), (int, float)):
+        return 1.0 / (1.0 + float(vector["distance"]))
+    return 0.0
+```
+
+The function handles multiple response formats defensively — `similarity`, `score`, and `distance` — but the S3 Vectors API returns `similarity` directly when using cosine metric.
+
+## Recency score
+
+Recency uses exponential decay with a 30-day half-life. An article published today scores 1.0; an older article decays smoothly toward zero.
+
+```python title="rag/query.py"
+import math
+from datetime import datetime, timezone
+
+RECENCY_HALF_LIFE_DAYS = 30.0
+
+def _recency_score(published_dt: datetime | None) -> float:
+    if published_dt is None:
+        return 0.25
+    age_days = max(
+        (datetime.now(timezone.utc) - published_dt).total_seconds() / 86_400.0,
+        0.0,
+    )
+    return math.exp(-age_days / RECENCY_HALF_LIFE_DAYS)
+```
+
+Articles with no publication date get a conservative 0.25 — enough to participate in results but not enough to compete with recent, dated content.
+
+### Decay examples
+
+<table>
+  <thead>
+    <tr>
+      <th>Age</th>
+      <th>Recency score</th>
+      <th>Effect on final score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Today (0 days)</td>
+      <td><code>1.00</code></td>
+      <td>Full recency bonus (+0.20)</td>
+    </tr>
+    <tr>
+      <td>7 days</td>
+      <td><code>0.79</code></td>
+      <td>Mild decay (+0.16)</td>
+    </tr>
+    <tr>
+      <td>30 days</td>
+      <td><code>0.37</code></td>
+      <td>Moderate decay (+0.07)</td>
+    </tr>
+    <tr>
+      <td>90 days</td>
+      <td><code>0.05</code></td>
+      <td>Near-zero bonus (+0.01)</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="note">
+The formula is <code>e^(-age_days / 30)</code>. At 30 days the score is <code>e^(-1) ≈ 0.37</code>, not exactly 0.5 — this is steeper than a true half-life but works well for news content where a month is old.
+</Aside>
+
+## Combining the scores
+
+The final ranking step is straightforward — multiply each component by its weight and sum:
+
+```python title="rag/query.py"
+similarity = _vector_similarity_score(vector)
+freshness = _recency_score(published_dt)
+final = (0.8 * similarity) + (0.2 * freshness)
+```
+
+### Worked example
+
+Consider two candidates for the query "What's new with S3 Vectors?":
+
+<table>
+  <thead>
+    <tr>
+      <th>Candidate</th>
+      <th>Similarity</th>
+      <th>Age</th>
+      <th>Recency</th>
+      <th>Final score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Article A (today)</td>
+      <td><code>0.82</code></td>
+      <td>0 days</td>
+      <td><code>1.00</code></td>
+      <td><code>0.8×0.82 + 0.2×1.00 = 0.86</code></td>
+    </tr>
+    <tr>
+      <td>Article B (old)</td>
+      <td><code>0.91</code></td>
+      <td>60 days</td>
+      <td><code>0.14</code></td>
+      <td><code>0.8×0.91 + 0.2×0.14 = 0.76</code></td>
+    </tr>
+  </tbody>
+</table>
+
+Article A wins despite lower similarity because it was published today. Without recency, Article B would rank first — fine for a research tool, but wrong for a news briefing.
+
+## Over-fetch and rerank
+
+The demo doesn't apply scoring inside S3 Vectors. Instead it uses a two-stage strategy:
+
+1. **Over-fetch** — request 3× the desired results from QueryVectors
+2. **Filter** — remove duplicates and articles outside the time window
+3. **Score** — apply the weighted formula to remaining candidates
+4. **Select** — take the top-K from the rescored list
+
+```python title="rag/query.py"
+RETRIEVAL_MULTIPLIER = 3
+
+desired_top_k = _adaptive_top_k(question, top_k)
+retrieval_top_k = min(desired_top_k * RETRIEVAL_MULTIPLIER, 20)
+
+response = s3vectors.query_vectors(
+    vectorBucketName=config.vector_bucket,
+    indexName=config.vector_index,
+    queryVector={"float32": query_embedding},
+    topK=retrieval_top_k,
+    returnMetadata=True,
+)
+```
+
+After retrieval, candidates are sorted by final score and trimmed to the desired count:
+
+```python title="rag/query.py"
+candidates.sort(key=lambda c: c.final_score, reverse=True)
+selected = candidates[:desired_top_k]
+```
+
+<Aside type="tip">
+Over-fetching is cheap — S3 Vectors returns results in single-digit milliseconds. The reranking step adds negligible latency but significantly improves answer quality for time-sensitive queries.
+</Aside>
+
+## Why rerank application-side?
+
+Pure vector similarity answers the question "which documents are about this topic?" but not "which documents are about this topic and still current?" For a news briefing app, a 3-month-old announcement about the same feature shouldn't outrank today's GA launch post.
+
+Reranking at the application layer gives you:
+
+- **Freshness signals** that the vector store doesn't have
+- **Deduplication** across sources that report the same news
+- **Time-window filtering** for queries like "last week's announcements"
+- **Flexibility** to tune weights without re-indexing vectors
+
+The vector store handles the hard part (approximate nearest neighbor search at scale), and the application handles the domain-specific ranking logic that requires business context.

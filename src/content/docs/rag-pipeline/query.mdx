@@ -1,0 +1,266 @@
+---
+title: Query Pipeline
+description: How questions become answers — embedding, search, reranking, and LLM generation.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+The query pipeline transforms a user question into a structured, sourced answer. It embeds the question, searches <Tooltip term="s3-vectors" label="S3 Vectors" /> for similar documents, reranks results using similarity and recency, builds a context window, and generates a response with <Tooltip term="bedrock" label="Bedrock" />.
+
+![Query pipeline — embedding, vector search, reranking, context building, and LLM generation](/s3-vectors-rag-workload/query-pipeline.png)
+
+## Request Lifecycle
+
+![Request lifecycle — full trace of a question through the system](/s3-vectors-rag-workload/request-lifecycle.png)
+
+A complete query passes through six stages:
+
+1. **Embed** — Convert the user question into a 1024-dimensional vector using <Tooltip term="titan-v2" label="Titan Embeddings V2" />
+2. **Search** — <Tooltip term="query-vectors" label="QueryVectors" /> from S3 Vectors with an over-fetched Top-K
+3. **Load** — Retrieve full document bodies from S3 for each match
+4. **Rerank** — Score candidates by 80% similarity + 20% recency, then select the best
+5. **Context** — Assemble top snippets into a prompt context window
+6. **Generate** — Invoke Claude via Bedrock to produce a structured answer
+
+## Adaptive Top-K Strategy
+
+Rather than using a fixed <Tooltip term="top-k" label="Top-K" /> value, the pipeline adapts how many vectors it retrieves based on the question type.
+
+```python title="rag/query.py"
+MIN_TOP_K = 3
+MAX_TOP_K = 8
+RETRIEVAL_MULTIPLIER = 3
+
+def _adaptive_top_k(question: str, requested_top_k: int) -> int:
+    target = max(MIN_TOP_K, requested_top_k)
+    if _extract_time_window_days(question) is not None:
+        target = max(target, 6)
+    elif _is_broad_query(question):
+        target = max(target, 5)
+    return min(target, MAX_TOP_K)
+```
+
+The function detects two patterns:
+
+- **Time-windowed queries** (e.g., "last 2 weeks") — bumps to at least 6 results
+- **Broad queries** (e.g., "summarize recent updates") — bumps to at least 5 results
+
+<Aside type="tip">The actual retrieval fetches `desired_top_k × RETRIEVAL_MULTIPLIER` vectors (capped at 20). This over-fetch ensures the reranking stage has enough candidates to choose from after filtering and deduplication.</Aside>
+
+## Over-Fetch and Filter
+
+The pipeline retrieves more vectors than it needs, then narrows down:
+
+```python title="rag/query.py"
+desired_top_k = _adaptive_top_k(question, top_k)
+retrieval_top_k = min(desired_top_k * RETRIEVAL_MULTIPLIER, 20)
+time_window_days = _extract_time_window_days(question)
+cutoff = (
+    datetime.now(timezone.utc) - timedelta(days=time_window_days)
+    if time_window_days else None
+)
+```
+
+After retrieval, candidates are filtered:
+
+1. **Source validation** — skip vectors with no source metadata
+2. **Time window** — discard documents published before the cutoff date
+3. **Deduplication** — remove duplicates by normalized URL or title
+
+## Reranking
+
+Each surviving candidate receives a composite score combining <Tooltip term="cosine" label="cosine similarity" /> with a recency boost:
+
+```python title="rag/query.py"
+RECENCY_HALF_LIFE_DAYS = 30.0
+
+def _recency_score(published_dt: datetime | None) -> float:
+    if published_dt is None:
+        return 0.25
+    age_days = max(
+        (datetime.now(timezone.utc) - published_dt).total_seconds() / 86_400.0,
+        0.0,
+    )
+    return math.exp(-age_days / RECENCY_HALF_LIFE_DAYS)
+```
+
+The final score formula:
+
+```
+final_score = (0.8 × similarity) + (0.2 × recency_score)
+```
+
+<Aside type="note">Documents with no publish date receive a default recency score of 0.25 — roughly equivalent to a 42-day-old article. This prevents undated documents from being unfairly penalized or boosted.</Aside>
+
+Candidates are sorted by final score descending, then the top `desired_top_k` are selected.
+
+## Snippet Extraction
+
+For each candidate, the pipeline extracts the most relevant paragraphs to use as context:
+
+```python title="rag/query.py"
+def _best_snippet(body: str, question: str, max_chars: int = 700) -> str:
+    paragraphs = [
+        part.strip() for part in body.split("\n\n") if part.strip()
+    ]
+    question_terms = _tokenize(question)
+    scored = []
+    for paragraph in paragraphs:
+        terms = _tokenize(paragraph)
+        overlap = len(question_terms.intersection(terms))
+        scored.append((overlap, len(paragraph), paragraph))
+    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    # Select paragraphs with highest term overlap
+    ...
+```
+
+Paragraphs are ranked by term overlap with the question. The function greedily selects paragraphs until the 700-character budget is consumed, prioritizing those with the most keyword matches.
+
+## Context Window Building
+
+The selected candidates are assembled into a structured context block for the <Tooltip term="llm" label="LLM" />:
+
+```python title="rag/query.py"
+MAX_CONTEXT_CHARS = 8_000
+
+def _build_context(candidates, max_chars=MAX_CONTEXT_CHARS):
+    blocks = []
+    total = 0
+    for idx, candidate in enumerate(candidates, start=1):
+        block = (
+            f"[{idx}] Title: {candidate.source.title}\n"
+            f"[{idx}] URL: {candidate.source.url}\n"
+            f"[{idx}] Published: {candidate.source.published}\n"
+            f"[{idx}] Feed: {candidate.source.feed}\n"
+            f"[{idx}] Snippet:\n{candidate.snippet}\n"
+        )
+        if total + len(block) > max_chars:
+            break
+        blocks.append(block)
+        total += len(block)
+    return "\n---\n".join(blocks)
+```
+
+Each source is numbered `[1]`, `[2]`, etc., so the LLM can cite them in its response. The context is capped at 8,000 characters to stay within prompt budget.
+
+<Aside type="caution">If no candidates survive filtering (empty result set), the pipeline returns a structured fallback message explaining that no matching announcements were found — it never sends an empty context to the LLM.</Aside>
+
+## LLM Generation
+
+The final stage invokes Claude via <Tooltip term="inference-profile" label="Bedrock inference profile" /> with a structured prompt:
+
+```python title="rag/query.py"
+def _bedrock_llm(client, model_id, context, question, source_count):
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1024,
+        "messages": [{
+            "role": "user",
+            "content": (
+                "You are an AWS news briefing assistant. "
+                "Use only the provided context.\n"
+                "If the context is insufficient, state that "
+                "clearly and do not guess.\n\n"
+                "Output markdown using this structure:\n"
+                "## Direct answer\n## What is known\n"
+                "## What is unclear\n## Sources used\n\n"
+                f"There are {source_count} sources in context. "
+                "Every factual bullet must cite at least one "
+                f"source.\n\nContext:\n{context}\n\n"
+                f"Question: {question}"
+            ),
+        }],
+    }
+    response = client.invoke_model(
+        modelId=model_id, body=json.dumps(body), ...
+    )
+```
+
+The prompt enforces:
+
+- **Grounding** — use only the provided context, no guessing
+- **Structure** — direct answer, known facts with citations, unclear items, sources used
+- **Citation** — every factual bullet must reference at least one numbered source
+
+## Entry Point
+
+The `ask()` function orchestrates the entire pipeline:
+
+```python title="rag/query.py"
+def ask(config: Config, question: str, top_k: int = 3) -> QueryResult:
+    """Run the full RAG query pipeline."""
+    bedrock = boto3.client("bedrock-runtime", region_name=config.aws_region)
+    s3vectors = boto3.client("s3vectors", region_name=config.aws_region)
+
+    desired_top_k = _adaptive_top_k(question, top_k)
+    retrieval_top_k = min(desired_top_k * RETRIEVAL_MULTIPLIER, 20)
+
+    query_embedding = _bedrock_embed(bedrock, config.embedding_model_id, question)
+    response = s3vectors.query_vectors(
+        vectorBucketName=config.vector_bucket,
+        indexName=config.vector_index,
+        queryVector={"float32": query_embedding},
+        topK=retrieval_top_k,
+        returnMetadata=True,
+    )
+    # ... filter, rerank, build context, generate ...
+    return QueryResult(question=question, answer=answer, sources=sources)
+```
+
+<Aside type="tip">The <code>ask()</code> function is invoked by the Query Lambda handler. The Lambda receives a JWT-authenticated request via API Gateway, extracts the question, calls <code>ask()</code>, and returns the structured response.</Aside>
+
+## Pipeline Parameters
+
+<table>
+  <thead>
+    <tr>
+      <th>Parameter</th>
+      <th>Value</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>MIN_TOP_K</code></td>
+      <td>3</td>
+      <td>Minimum number of sources in final answer</td>
+    </tr>
+    <tr>
+      <td><code>MAX_TOP_K</code></td>
+      <td>8</td>
+      <td>Maximum sources regardless of query type</td>
+    </tr>
+    <tr>
+      <td><code>RETRIEVAL_MULTIPLIER</code></td>
+      <td>3</td>
+      <td>Over-fetch factor (retrieve 3× desired)</td>
+    </tr>
+    <tr>
+      <td><code>MAX_CONTEXT_CHARS</code></td>
+      <td>8,000</td>
+      <td>Maximum context window size for LLM prompt</td>
+    </tr>
+    <tr>
+      <td><code>RECENCY_HALF_LIFE_DAYS</code></td>
+      <td>30</td>
+      <td>Exponential decay half-life for recency scoring</td>
+    </tr>
+    <tr>
+      <td>Snippet max chars</td>
+      <td>700</td>
+      <td>Character budget per document snippet</td>
+    </tr>
+    <tr>
+      <td><code>max_tokens</code></td>
+      <td>1,024</td>
+      <td>Maximum LLM response length</td>
+    </tr>
+  </tbody>
+</table>
+
+## Related Pages
+
+- [Similarity Scoring](/s3-vectors-rag-workload/rag-pipeline/scoring/) — detailed breakdown of the scoring formula
+- [Embeddings](/s3-vectors-rag-workload/rag-pipeline/embeddings/) — how text becomes vectors
+- [Ingest Pipeline](/s3-vectors-rag-workload/rag-pipeline/ingest/) — how documents enter the system

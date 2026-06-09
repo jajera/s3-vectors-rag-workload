@@ -1,0 +1,182 @@
+---
+title: Teardown
+description: Destroy all resources to stop billing.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+When you are done exploring the demo, destroy the infrastructure to stop all AWS charges. Because every resource is managed by <Tooltip term="terraform" label="Terraform" />, a single command removes the entire stack — no manual console cleanup required.
+
+<Aside type="caution">
+Teardown is permanent. All stored articles, vectors, user accounts, and application data are deleted and cannot be recovered.
+</Aside>
+
+## Run terraform destroy
+
+From the root of the source repo, run:
+
+```bash title="Terminal"
+terraform destroy
+```
+
+Terraform displays a plan showing every resource it will remove, then prompts for confirmation:
+
+```text
+Plan: 0 to add, 0 to change, 47 to destroy.
+
+Do you really want to destroy all resources?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+```
+
+Type `yes` to proceed. The destroy takes approximately 2–3 minutes.
+
+<Aside type="tip">
+To skip the interactive prompt in CI or scripted workflows, pass the <code>-auto-approve</code> flag: <code>terraform destroy -auto-approve</code>
+</Aside>
+
+## force_destroy behavior
+
+Both S3 buckets in this project are configured with `force_destroy = true` in the Terraform configuration. This means Terraform automatically empties the buckets before deleting them — you do not need to manually remove objects first.
+
+<table>
+  <thead>
+    <tr>
+      <th>Bucket type</th>
+      <th>Contents removed</th>
+      <th>Terraform resource</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Standard S3 bucket</td>
+      <td>All ingested article HTML files and metadata</td>
+      <td><code>aws_s3_bucket</code></td>
+    </tr>
+    <tr>
+      <td><Tooltip term="vector-bucket" label="S3 Vectors bucket" /></td>
+      <td>All stored vectors and the <Tooltip term="vector-index" label="vector index" /></td>
+      <td><code>aws_s3vectors_vector_bucket</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="note">
+Without <code>force_destroy = true</code>, Terraform would refuse to delete non-empty buckets and the destroy would fail. This project sets it on both buckets so teardown always succeeds cleanly.
+</Aside>
+
+## What gets removed
+
+Terraform destroys resources in reverse dependency order — it removes resources that depend on others first, then works down to foundational resources. You do not need to manage the order yourself.
+
+### Complete resource list
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>What is lost</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S3 bucket</td>
+      <td>All ingested article documents (HTML content and metadata)</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="s3-vectors" label="S3 Vectors" /> bucket + index</td>
+      <td>All embedding vectors — similarity search is no longer possible</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="lambda" label="Lambda" /> functions (ingest + query)</td>
+      <td>Compute capacity for ingestion and RAG queries</td>
+    </tr>
+    <tr>
+      <td>CloudWatch log groups</td>
+      <td>All Lambda execution logs</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="api-gateway" label="API Gateway" /> HTTP API</td>
+      <td>Public API endpoint and route configuration</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="cognito" label="Cognito" /> user pool</td>
+      <td>All user accounts, passwords, and group memberships</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="amplify" label="Amplify" /> app</td>
+      <td>Hosted web UI and its HTTPS domain</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule</td>
+      <td>Daily ingest cron trigger</td>
+    </tr>
+    <tr>
+      <td>IAM roles and policies</td>
+      <td>All least-privilege permissions created for this stack</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="danger">
+User accounts in Cognito are permanently deleted. If you need to preserve user data, export it before running destroy.
+</Aside>
+
+## Verify resources are gone
+
+After the destroy completes, confirm nothing remains:
+
+```bash title="Terminal"
+terraform show
+```
+
+This should output an empty state:
+
+```text
+No state.
+```
+
+You can also verify in the AWS console or CLI that the resources no longer exist:
+
+```bash title="Terminal"
+aws s3api list-buckets --query "Buckets[?contains(Name, 's3vec-rag')]"
+aws lambda list-functions --query "Functions[?contains(FunctionName, 's3vec-rag')]"
+```
+
+Both commands should return empty arrays (`[]`).
+
+<Aside type="tip">
+If <code>terraform show</code> still displays resources, run <code>terraform destroy</code> again. Occasional timing issues with eventual-consistency services may require a second pass.
+</Aside>
+
+## Cost after teardown
+
+Once all resources are destroyed, there are no ongoing AWS charges for this demo. The project uses only pay-per-use services — with no resources provisioned, your bill is zero.
+
+<Aside type="note">
+<Tooltip term="bedrock" label="Bedrock" /> model access enablement (from the prerequisites step) remains active on your account but incurs no charges by itself. You only pay when API calls are made.
+</Aside>
+
+## Partial cleanup
+
+If you want to keep some resources while removing others, use Terraform's targeted destroy:
+
+```bash title="Terminal"
+# Remove only the Amplify app (stop hosting the UI)
+terraform destroy -target=aws_amplify_app.this
+
+# Remove only the EventBridge schedule (stop daily ingestion)
+terraform destroy -target=aws_scheduler_schedule.ingest
+```
+
+<Aside type="caution">
+Targeted destroys can leave the state inconsistent. Resources that depend on removed ones may fail on the next <code>terraform apply</code>. Use full destroy and redeploy if you are unsure.
+</Aside>
+
+## Next steps
+
+- [Troubleshooting](/s3-vectors-rag-workload/troubleshooting/) — if destroy fails or resources remain
+- [Terraform Apply](/s3-vectors-rag-workload/deployment/terraform-apply/) — redeploy the stack from scratch

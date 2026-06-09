@@ -1,0 +1,559 @@
+---
+title: Bedrock Errors
+description: AccessDeniedException, throttling, and model availability issues.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+This page covers common <Tooltip term="bedrock" label="Amazon Bedrock" /> errors you may encounter when running the ingest or query <Tooltip term="lambda" label="Lambda" /> functions. Each section shows what the error looks like in CloudWatch, explains the root causes, and provides step-by-step resolution.
+
+## AccessDeniedException
+
+This is the most common Bedrock error. It means the calling identity is not authorized to invoke the requested model.
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred (AccessDeniedException)
+when calling the InvokeModel operation: You don't have access to the model
+with the specified model ID.
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Model access not enabled</td>
+      <td>The <Tooltip term="embedding-model" label="Titan Embeddings V2" /> or LLM has not been enabled in the Bedrock console for your account and region.</td>
+    </tr>
+    <tr>
+      <td>IAM policy missing <code>bedrock:InvokeModel</code></td>
+      <td>The Lambda execution role does not include the <code>bedrock:InvokeModel</code> action for the model ARN.</td>
+    </tr>
+    <tr>
+      <td>Wrong region</td>
+      <td>The Lambda is deployed in a region where the model is not available or not enabled.</td>
+    </tr>
+    <tr>
+      <td><Tooltip term="inference-profile" label="Inference profile" /> not available</td>
+      <td>Cross-region inference profiles require model access enabled in ALL regions the profile routes to.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Step-by-step resolution
+
+1. **Check model access in Bedrock console:**
+
+```bash
+aws bedrock list-foundation-models \
+  --query "modelSummaries[?modelId=='amazon.titan-embed-text-v2:0'].modelId" \
+  --output text
+```
+
+If the model appears but you still get access errors, enable it explicitly:
+
+- Open the [Bedrock console](https://console.aws.amazon.com/bedrock/) → Model access → Enable specific models
+- Select **Titan Embeddings V2** and the LLM you are using
+- Wait for status to change to **Access granted**
+
+2. **Verify the IAM policy:**
+
+```bash
+aws iam get-role-policy \
+  --role-name your-ingest-lambda-role \
+  --policy-name your-policy-name \
+  --query "PolicyDocument.Statement[?Action=='bedrock:InvokeModel'].Resource"
+```
+
+Confirm the resource ARN matches the model ID exactly:
+
+```text
+arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0
+```
+
+3. **Check the region:**
+
+```bash
+aws bedrock list-foundation-models --region us-east-1 \
+  --query "modelSummaries[?modelId=='amazon.titan-embed-text-v2:0'].modelId"
+```
+
+If empty, the model is not available in that region. Redeploy to a supported region.
+
+4. **For inference profiles, enable in all routed regions:**
+
+```bash
+aws bedrock get-inference-profile \
+  --inference-profile-identifier "your-profile-arn" \
+  --query "models[].modelArn"
+```
+
+Enable access in each region listed.
+
+### Verify the fix
+
+Invoke the Lambda manually and confirm a successful response:
+
+```bash
+aws lambda invoke \
+  --function-name your-ingest-function \
+  --payload '{}' \
+  --cli-binary-format raw-in-base64-out \
+  output.json && cat output.json
+```
+
+A 200 response with no error key confirms the fix worked.
+
+## ThrottlingException
+
+<Tooltip term="bedrock" label="Bedrock" /> enforces per-model, per-account rate limits (tokens per minute and requests per minute).
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred (ThrottlingException)
+when calling the InvokeModel operation: Too many requests, please wait
+before trying again.
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Burst during batch ingest</td>
+      <td>Ingesting many documents at once exceeds the default requests-per-minute quota for <Tooltip term="titan-v2" label="Titan V2" />.</td>
+    </tr>
+    <tr>
+      <td>Account-level quota too low</td>
+      <td>Default Bedrock quotas are conservative for new accounts (e.g., 100 RPM for embedding models).</td>
+    </tr>
+    <tr>
+      <td>Concurrent Lambda invocations</td>
+      <td>Multiple concurrent ingest Lambdas all hitting Bedrock simultaneously.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Built-in retry behavior
+
+The ingest Lambda includes exponential backoff with jitter — up to 6 retry attempts. Most transient throttling resolves within retries.
+
+<Aside type="note">
+If you see ThrottlingException in logs but the function completes successfully, the retries handled it. Only investigate if the function returns an error or times out.
+</Aside>
+
+### Step-by-step resolution
+
+1. **Check CloudWatch metrics for throttling:**
+
+```bash
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/Bedrock \
+  --metric-name Invocations \
+  --dimensions Name=ModelId,Value=amazon.titan-embed-text-v2:0 \
+  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum
+```
+
+2. **Check current quota:**
+
+```bash
+aws service-quotas get-service-quota \
+  --service-code bedrock \
+  --quota-code L-EXAMPLE12345 \
+  --query "Quota.Value"
+```
+
+<Aside type="tip">
+Find the exact quota code in the Service Quotas console under Amazon Bedrock → Titan Embeddings V2 model invocations.
+</Aside>
+
+3. **Request a quota increase:**
+
+```bash
+aws service-quotas request-service-quota-increase \
+  --service-code bedrock \
+  --quota-code L-EXAMPLE12345 \
+  --desired-value 500
+```
+
+4. **Reduce concurrency (temporary mitigation):**
+
+Lower the Lambda reserved concurrency to limit parallel Bedrock calls:
+
+```bash
+aws lambda put-function-concurrency \
+  --function-name your-ingest-function \
+  --reserved-concurrent-executions 2
+```
+
+### Verify the fix
+
+After a quota increase takes effect (usually within minutes), trigger another ingest and confirm no ThrottlingException appears in CloudWatch Logs:
+
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/your-ingest-function \
+  --start-time $(date -u -d '5 minutes ago' +%s)000 \
+  --filter-pattern "ThrottlingException"
+```
+
+An empty result means throttling is resolved.
+
+## ValidationException
+
+Bedrock returns this when the request body does not meet the model's input requirements.
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred (ValidationException)
+when calling the InvokeModel operation: Malformed input request: expected
+maxTokens to be integer, got null
+```
+
+Or for embedding input issues:
+
+```text
+botocore.exceptions.ClientError: An error occurred (ValidationException)
+when calling the InvokeModel operation: 1 validation error detected: Value
+at 'body.inputText' failed to satisfy constraint: Member must not be null
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Empty input text</td>
+      <td>An empty string or None was passed as <code>inputText</code> to the embedding model.</td>
+    </tr>
+    <tr>
+      <td>Text exceeds token limit</td>
+      <td>Titan Embeddings V2 supports up to 8,192 tokens per input. Very long documents without truncation will fail.</td>
+    </tr>
+    <tr>
+      <td>Malformed request body</td>
+      <td>Missing required fields, wrong data types, or invalid JSON in the <code>InvokeModel</code> body.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Step-by-step resolution
+
+1. **Check for empty inputs:**
+
+Review the ingest Lambda logs for the document that failed. Look for empty content after HTML stripping:
+
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/your-ingest-function \
+  --filter-pattern "ValidationException" \
+  --limit 5
+```
+
+2. **Verify text length:**
+
+<Tooltip term="titan-v2" label="Titan Embeddings V2" /> accepts up to 8,192 tokens (roughly 30,000 characters of English text). The ingest function truncates content before embedding. If you see this error, confirm the truncation logic is working:
+
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/your-ingest-function \
+  --filter-pattern "inputText" \
+  --limit 3
+```
+
+3. **Validate the request body format:**
+
+The correct format for Titan Embeddings V2:
+
+```json
+{
+  "inputText": "Your text here",
+  "dimensions": 1024,
+  "normalize": true
+}
+```
+
+Ensure `inputText` is a non-empty string, `dimensions` is an integer, and `normalize` is a boolean.
+
+<Aside type="caution">
+If an RSS feed item has no content (only a title), the ingest function may pass an empty string to the embedding model. The code should skip items with empty body text.
+</Aside>
+
+### Verify the fix
+
+Trigger a test ingest and confirm embeddings are generated without errors:
+
+```bash
+aws lambda invoke \
+  --function-name your-ingest-function \
+  --payload '{"source": "test"}' \
+  --cli-binary-format raw-in-base64-out \
+  output.json && cat output.json
+```
+
+## ModelNotReadyException
+
+This occurs when you have just enabled a model in Bedrock but it is not yet available for inference.
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred (ModelNotReadyException)
+when calling the InvokeModel operation: The model is not ready to serve
+inference requests. Please wait and try again.
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Model just enabled</td>
+      <td>After enabling model access, there is a provisioning delay (typically 5–10 minutes).</td>
+    </tr>
+    <tr>
+      <td>Deployed too quickly after enabling</td>
+      <td>Running <code>terraform apply</code> immediately after enabling model access may hit this window.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Step-by-step resolution
+
+1. **Wait 10 minutes** after enabling model access before invoking.
+
+2. **Check model access status:**
+
+```bash
+aws bedrock get-foundation-model-availability \
+  --model-id amazon.titan-embed-text-v2:0
+```
+
+<Aside type="tip">
+If you are deploying via Terraform for the first time, enable model access in the Bedrock console at least 10 minutes before running <code>terraform apply</code>. This avoids the Lambda bootstrapping against an unavailable model.
+</Aside>
+
+3. **Retry the Lambda:** The built-in retry logic will handle this if the delay is short. For longer delays, manually invoke after waiting:
+
+```bash
+aws lambda invoke \
+  --function-name your-ingest-function \
+  --payload '{}' \
+  --cli-binary-format raw-in-base64-out \
+  output.json
+```
+
+### Verify the fix
+
+A successful invocation with no ModelNotReadyException confirms the model is ready. Check that the function returns embedded vectors:
+
+```bash
+aws logs tail /aws/lambda/your-ingest-function --since 2m \
+  | grep -i "successfully"
+```
+
+## ServiceUnavailableException
+
+A transient error indicating the Bedrock service itself is experiencing issues.
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred
+(ServiceUnavailableException) when calling the InvokeModel operation:
+The service is temporarily unavailable. Please try again later.
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Bedrock service disruption</td>
+      <td>Temporary capacity issues in the Bedrock service. Typically resolves within minutes.</td>
+    </tr>
+    <tr>
+      <td>Regional capacity constraints</td>
+      <td>High demand in a specific region may cause brief unavailability.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Step-by-step resolution
+
+1. **Check AWS Health Dashboard:**
+
+Visit the [AWS Health Dashboard](https://health.aws.amazon.com/health/status) to see if there is an active Bedrock incident in your region.
+
+2. **Wait and retry:** The Lambda's exponential backoff handles transient issues. If the function timed out, invoke it again after a few minutes:
+
+```bash
+aws lambda invoke \
+  --function-name your-ingest-function \
+  --payload '{}' \
+  --cli-binary-format raw-in-base64-out \
+  output.json
+```
+
+3. **Check if the issue persists:**
+
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/your-ingest-function \
+  --start-time $(date -u -d '30 minutes ago' +%s)000 \
+  --filter-pattern "ServiceUnavailableException"
+```
+
+<Aside type="note">
+If ServiceUnavailableException persists for more than 30 minutes and no AWS Health event is reported, open an AWS Support case.
+</Aside>
+
+### Verify the fix
+
+Once the service recovers, confirm by running a successful invocation. Check CloudWatch for clean executions:
+
+```bash
+aws logs tail /aws/lambda/your-ingest-function --since 5m \
+  | grep -c "ERROR"
+```
+
+A count of 0 confirms normal operation.
+
+## ResourceNotFoundException
+
+Bedrock cannot find the model or inference profile you specified.
+
+### What you see in CloudWatch
+
+```text
+botocore.exceptions.ClientError: An error occurred
+(ResourceNotFoundException) when calling the InvokeModel operation: Could
+not resolve the foundation model from the provided model identifier.
+```
+
+Or for inference profiles:
+
+```text
+botocore.exceptions.ClientError: An error occurred
+(ResourceNotFoundException) when calling the InvokeModel operation: The
+inference profile 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.invalid.model' does not exist.
+```
+
+### Root causes
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Wrong model ID</td>
+      <td>Typo in the model identifier (e.g., <code>amazon.titan-embed-text-v2</code> instead of <code>amazon.titan-embed-text-v2:0</code>).</td>
+    </tr>
+    <tr>
+      <td>Inference profile does not exist</td>
+      <td>The ARN references a profile that was never created, was deleted, or is in a different account.</td>
+    </tr>
+    <tr>
+      <td>Model not available in region</td>
+      <td>Some models are only available in specific regions. Using a model ID in an unsupported region returns this error.</td>
+    </tr>
+  </tbody>
+</table>
+
+### Step-by-step resolution
+
+1. **Verify the model ID:**
+
+```bash
+aws bedrock list-foundation-models \
+  --query "modelSummaries[?contains(modelId,'titan-embed')].modelId" \
+  --output table
+```
+
+The correct embedding model ID is:
+
+```text
+amazon.titan-embed-text-v2:0
+```
+
+<Aside type="caution">
+The <code>:0</code> version suffix is required. Omitting it causes a ResourceNotFoundException.
+</Aside>
+
+2. **Verify inference profile exists:**
+
+```bash
+aws bedrock list-inference-profiles \
+  --query "inferenceProfileSummaries[].inferenceProfileArn" \
+  --output table
+```
+
+3. **Check your <Tooltip term="terraform" label="Terraform" /> variables:**
+
+Confirm the model IDs in your Terraform variables match exactly:
+
+```bash
+grep -r "model_id" terraform.tfvars
+```
+
+Expected values:
+- Embedding: `amazon.titan-embed-text-v2:0`
+- LLM inference profile: check the profile ARN in your account
+
+### Verify the fix
+
+After correcting the model ID or profile ARN, redeploy and test:
+
+```bash
+terraform apply -auto-approve
+aws lambda invoke \
+  --function-name your-ingest-function \
+  --payload '{}' \
+  --cli-binary-format raw-in-base64-out \
+  output.json && cat output.json
+```
+
+A successful response confirms the resource is found.
+

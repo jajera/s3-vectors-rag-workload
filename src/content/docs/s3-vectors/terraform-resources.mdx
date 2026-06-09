@@ -1,0 +1,120 @@
+---
+title: Terraform Resources
+description: How to provision S3 Vectors infrastructure with Terraform.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Provider requirement
+
+S3 Vectors requires AWS provider >= 6.24.0:
+
+```hcl title="versions.tf"
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 6.24.0"
+    }
+  }
+}
+```
+
+## Creating a vector bucket
+
+```hcl title="s3_vectors.tf"
+resource "aws_s3vectors_vector_bucket" "this" {
+  vector_bucket_name = local.vector_bucket_name
+}
+```
+
+The bucket name must be globally unique. This demo uses a `random_id` prefix:
+
+```hcl title="main.tf"
+resource "random_id" "bucket_prefix" {
+  byte_length = 4
+}
+
+locals {
+  vector_bucket_name = "${random_id.bucket_prefix.hex}-${var.vector_bucket_name}"
+}
+```
+
+## Creating a vector index
+
+```hcl title="s3_vectors.tf"
+resource "aws_s3vectors_index" "this" {
+  vector_bucket_name = aws_s3vectors_vector_bucket.this.vector_bucket_name
+  index_name         = var.vector_index_name
+
+  dimension       = var.vector_dimension       # 1024
+  distance_metric = var.vector_distance_metric # "cosine"
+  data_type       = "float32"
+}
+```
+
+## Key attributes
+
+<table>
+  <thead>
+    <tr>
+      <th>Attribute</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>vector_bucket_name</code></td>
+      <td>Output</td>
+      <td>The bucket name (used in API calls)</td>
+    </tr>
+    <tr>
+      <td><code>vector_bucket_arn</code></td>
+      <td>Output</td>
+      <td>Full ARN (used in IAM policies)</td>
+    </tr>
+    <tr>
+      <td><code>index_name</code></td>
+      <td>Output</td>
+      <td>Index name (used in API calls)</td>
+    </tr>
+    <tr>
+      <td><code>index_arn</code></td>
+      <td>Output</td>
+      <td>Full ARN of the index</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="tip">
+Reference <code>aws_s3vectors_vector_bucket.this.vector_bucket_arn</code> in IAM policies — scope permissions to <code>{'${arn}/*'}</code> to cover all indexes.
+</Aside>
+
+## Variables for flexibility
+
+```hcl title="variables.tf"
+variable "vector_dimension" {
+  description = "Dimensionality of vector embeddings"
+  type        = number
+  default     = 1024
+
+  validation {
+    condition     = var.vector_dimension >= 1 && var.vector_dimension <= 4096
+    error_message = "Must be between 1 and 4096."
+  }
+}
+
+variable "vector_distance_metric" {
+  description = "Distance metric for similarity search"
+  type        = string
+  default     = "cosine"
+
+  validation {
+    condition     = contains(["cosine", "euclidean"], var.vector_distance_metric)
+    error_message = "Must be cosine or euclidean."
+  }
+}
+```

@@ -1,0 +1,148 @@
+---
+title: Deployment
+description: Deploy the full RAG stack with a single terraform apply.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+A single `terraform apply` provisions the entire stack — storage, compute, auth, and hosting — in roughly 3–5 minutes. This page explains what happens during that deploy and the order resources are created.
+
+## Deployment timeline
+
+<Tooltip term="terraform" label="Terraform" /> resolves resource dependencies automatically and creates things in parallel where possible. The overall apply takes **3–5 minutes**, with most of that time spent on the bootstrap ingest and web UI deployment.
+
+<table>
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Duration</th>
+      <th>What happens</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>1. Foundation</strong></td>
+      <td>~30s</td>
+      <td>IAM roles, CloudWatch log groups, S3 bucket, S3 Vectors bucket + index</td>
+    </tr>
+    <tr>
+      <td><strong>2. Compute + Auth</strong></td>
+      <td>~30s</td>
+      <td>Lambda functions (ingest + query), Cognito user pool + client, API Gateway</td>
+    </tr>
+    <tr>
+      <td><strong>3. Scheduling + Hosting</strong></td>
+      <td>~15s</td>
+      <td>EventBridge schedule, Amplify app resource</td>
+    </tr>
+    <tr>
+      <td><strong>4. Bootstrap ingest</strong></td>
+      <td>~60–90s</td>
+      <td>Lambda invocation: fetches RSS, embeds ~120 articles, stores vectors</td>
+    </tr>
+    <tr>
+      <td><strong>5. Web UI deploy</strong></td>
+      <td>~60–90s</td>
+      <td>Builds React app with config injection, deploys to Amplify</td>
+    </tr>
+  </tbody>
+</table>
+
+<Aside type="note">
+Phases 1–3 run with Terraform parallelism. Phases 4 and 5 are sequential — the bootstrap ingest needs the vector index to exist, and the web UI needs Cognito and API Gateway outputs.
+</Aside>
+
+## Resource creation order
+
+Terraform's dependency graph determines creation order. Here's how the resources relate:
+
+### Phase 1 — Foundation
+
+These have no dependencies and are created first:
+
+- **IAM roles and policies** — Least-privilege roles for both <Tooltip term="lambda" label="Lambda" /> functions
+- **CloudWatch log groups** — Log retention for Lambda executions
+- **S3 bucket** — Stores raw article content and web app assets
+- **S3 Vectors bucket** — The <Tooltip term="vector-bucket" label="vector bucket" /> that hosts the vector index
+- **S3 Vectors index** — The <Tooltip term="vector-index" label="vector index" /> (1024 dimensions, cosine, float32)
+
+### Phase 2 — Compute and Auth
+
+Depends on IAM roles and the vector index being ready:
+
+- **Ingest Lambda** — Python function that fetches, embeds, and stores articles
+- **Query Lambda** — Python function that searches vectors and generates answers via <Tooltip term="bedrock" label="Bedrock" />
+- **<Tooltip term="cognito" label="Cognito" /> user pool** — Authentication with auto-created admin user
+- **Cognito app client** — OAuth2 settings for the web UI
+- **<Tooltip term="api-gateway" label="API Gateway" /> HTTP API** — Routes with JWT authorizer pointing to Query Lambda
+
+### Phase 3 — Scheduling and Hosting
+
+Depends on Lambda functions and Cognito:
+
+- **<Tooltip term="eventbridge" label="EventBridge" /> schedule** — Daily cron trigger for the ingest Lambda
+- **<Tooltip term="amplify" label="Amplify" /> app** — Hosting resource for the web UI SPA
+
+### Phase 4 — Bootstrap ingest
+
+Triggered by an `aws_lambda_invocation` resource that depends on the ingest Lambda and vector index:
+
+- Invokes the ingest function with an empty payload
+- The function fetches AWS announcements via RSS feeds
+- Each article is embedded using <Tooltip term="embedding-model" label="Titan Embeddings V2" />
+- Vectors are stored via <Tooltip term="put-vectors" label="PutVectors" /> with metadata (title, URL, date, feed)
+- Result: ~120 articles indexed and searchable
+
+### Phase 5 — Web UI deploy
+
+A `null_resource` with a `local-exec` provisioner runs the `deploy-web.sh` script:
+
+- Injects Cognito and API Gateway outputs into the React app config
+- Builds the production bundle
+- Deploys the built assets to Amplify
+
+<Aside type="caution">
+The web UI deploy runs on your local machine (not in AWS). It requires Node.js and npm to be available in your shell.
+</Aside>
+
+## What you see in the terminal
+
+During `terraform apply`, expect output like:
+
+```bash
+aws_iam_role.ingest: Creating...
+aws_s3vectors_vector_bucket.this: Creating...
+aws_s3vectors_vector_bucket.this: Creation complete after 3s
+aws_s3vectors_index.this: Creating...
+aws_s3vectors_index.this: Creation complete after 5s
+aws_lambda_function.ingest: Creating...
+aws_lambda_function.query: Creating...
+aws_cognito_user_pool.this: Creating...
+...
+aws_lambda_invocation.bootstrap: Creating...
+aws_lambda_invocation.bootstrap: Still creating... [1m0s elapsed]
+aws_lambda_invocation.bootstrap: Creation complete after 1m23s
+null_resource.deploy_web: Creating...
+null_resource.deploy_web: Provisioning with 'local-exec'...
+null_resource.deploy_web: Still creating... [1m0s elapsed]
+null_resource.deploy_web: Creation complete after 1m35s
+
+Apply complete! Resources: 22 added, 0 changed, 0 destroyed.
+```
+
+<Aside type="tip">
+If the bootstrap ingest takes longer than 2 minutes, check your network connectivity and Bedrock API throttling. The ingest function makes ~120 embedding API calls.
+</Aside>
+
+## After deployment completes
+
+Once `terraform apply` finishes, you have:
+
+- A fully populated vector index with ~120 embedded articles
+- A live API endpoint (API Gateway URL in Terraform outputs)
+- An authenticated web UI accessible via the Amplify URL
+- A daily schedule that keeps the corpus fresh via EventBridge
+- An admin user auto-created in Cognito (credentials in Terraform outputs)
+
+The next steps cover the [terraform apply commands](/s3-vectors-rag-workload/deployment/terraform-apply/) in detail, [Cognito user management](/s3-vectors-rag-workload/deployment/cognito-users/), and the [web UI configuration](/s3-vectors-rag-workload/deployment/web-ui/).

@@ -1,0 +1,447 @@
+---
+title: Common Issues
+description: Deployment, API, and UI troubleshooting.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tooltip from '@/components/Tooltip.astro';
+
+This page covers frequently encountered issues when deploying and using the RAG demo. Each section describes the symptom, root cause, step-by-step fix, and how to verify the resolution.
+
+## Bootstrap ingest timeout
+
+### Symptom
+
+The bootstrap <Tooltip term="lambda" label="Lambda" /> invocation returns a timeout error after 480 seconds, or the response payload contains a `"errorType": "Task timed out"` message.
+
+### Root cause
+
+The ingest function has a hard 480-second (8-minute) timeout configured in <Tooltip term="terraform" label="Terraform" />. During bootstrap, the function fetches RSS feeds, strips HTML, generates embeddings via <Tooltip term="bedrock" label="Bedrock" />, and stores vectors. Any of these steps can be slow:
+
+- RSS feed servers responding slowly or timing out
+- Bedrock throttling embedding requests (ThrottlingException with exponential backoff)
+- Large number of articles to process on first run
+
+### Fix
+
+Re-invoke the function manually. The ingest is idempotent — duplicate articles are skipped based on their URL key:
+
+```bash
+aws lambda invoke \
+  --function-name "$(terraform output -raw ingest_function_name)" \
+  --payload '{}' \
+  /tmp/ingest-out.json
+```
+
+Check the output for errors:
+
+```bash
+cat /tmp/ingest-out.json | python3 -m json.tool
+```
+
+If throttling is the cause, wait 60 seconds and retry. The built-in backoff handles transient throttles, but sustained throttling requires multiple invocations to process the full corpus.
+
+<Aside type="tip">
+You can monitor progress in CloudWatch Logs. Filter for the function name and look for "Processed X articles" messages.
+</Aside>
+
+### Verification
+
+Call the status endpoint to confirm the corpus is populated:
+
+```bash
+curl -s "$(terraform output -raw api_endpoint)/status" | python3 -m json.tool
+```
+
+The response should show a non-zero `vector_count` value.
+
+## Empty query results
+
+### Symptom
+
+The query endpoint returns an empty `results` array or the web UI shows "No relevant articles found" for every question.
+
+### Root cause
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>How to identify</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Corpus not ingested</td>
+      <td>The <code>/status</code> endpoint returns <code>vector_count: 0</code></td>
+    </tr>
+    <tr>
+      <td>Question does not match indexed content</td>
+      <td>The similarity scores returned are all below the 0.3 threshold</td>
+    </tr>
+    <tr>
+      <td>Time filter too narrow</td>
+      <td>Metadata filter excludes all articles outside the requested date range</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fix
+
+**1. Check corpus status:**
+
+```bash
+curl -s "$(terraform output -raw api_endpoint)/status" | python3 -m json.tool
+```
+
+If `vector_count` is 0, run the bootstrap ingest (see previous section).
+
+**2. Test with a broad question:**
+
+Try a general question that should match many articles, such as "What are the latest AWS announcements?" If this works but specific questions don't, the issue is query relevance rather than missing data.
+
+**3. Check time filtering:**
+
+If your query includes a time range, try without it first. The <Tooltip term="s3-vectors" label="S3 Vectors" /> index stores article publish dates in metadata, and a narrow window can exclude all results.
+
+<Aside type="note">
+The scoring formula uses 0.8 similarity + 0.2 recency weighting. Very old articles may rank lower even if semantically relevant.
+</Aside>
+
+### Verification
+
+A successful query returns a non-empty `results` array with similarity scores above 0.3 and a generated answer from the LLM.
+
+## CORS errors in browser
+
+### Symptom
+
+The browser console shows errors like:
+
+```
+Access to fetch at 'https://xxx.execute-api.region.amazonaws.com/query'
+from origin 'https://main.xxx.amplifyapp.com' has been blocked by CORS policy
+```
+
+The web UI fails to load data or submit queries.
+
+### Root cause
+
+<Tooltip term="api-gateway" label="API Gateway" /> CORS configuration requires an exact origin match. If the <Tooltip term="amplify" label="Amplify" /> URL does not match the allowed origin configured in the API, the browser blocks the request.
+
+Common mismatches:
+
+- Trailing slash in one but not the other
+- HTTP vs HTTPS
+- Branch-specific Amplify URLs (e.g., `pr-5.xxx.amplifyapp.com` instead of `main.xxx.amplifyapp.com`)
+
+### Fix
+
+**1. Find the actual Amplify URL:**
+
+```bash
+terraform output amplify_url
+```
+
+**2. Check the configured CORS origin in Terraform:**
+
+```bash
+grep -n "amplify_origin" main.tf
+```
+
+**3. Update the origin value if mismatched:**
+
+Edit `main.tf` and set `local.amplify_origin` to the exact Amplify URL (no trailing slash):
+
+```hcl title="main.tf"
+locals {
+  amplify_origin = "https://main.d1abc2def3ghij.amplifyapp.com"
+}
+```
+
+**4. Apply the change:**
+
+```bash
+terraform apply -target=module.api_gateway
+```
+
+<Aside type="caution">
+The CORS origin must match exactly — including protocol, subdomain, and no trailing slash. A single character difference causes the browser to block all API requests.
+</Aside>
+
+### Verification
+
+Open the browser developer tools Network tab, submit a query, and confirm the response includes the `Access-Control-Allow-Origin` header matching your Amplify URL.
+
+## Authentication errors
+
+### Symptom
+
+API requests return `401 Unauthorized` or the web UI shows "Session expired" or "User not authorized" messages. The <Tooltip term="cognito" label="Cognito" /> login page may reject credentials.
+
+### Root cause
+
+<table>
+  <thead>
+    <tr>
+      <th>Cause</th>
+      <th>Error message</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Expired JWT token</td>
+      <td><code>Token expired</code> or <code>401</code> from API Gateway</td>
+    </tr>
+    <tr>
+      <td>User not confirmed</td>
+      <td><code>UserNotConfirmedException</code> during sign-in</td>
+    </tr>
+    <tr>
+      <td>Wrong Cognito client ID</td>
+      <td><code>ResourceNotFoundException</code> or login page shows generic error</td>
+    </tr>
+    <tr>
+      <td>User not in authorized group</td>
+      <td><code>403 Forbidden</code> from API Gateway authorizer</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fix
+
+**1. Expired token — re-authenticate:**
+
+Tokens expire after 1 hour by default. Sign out and sign back in through the web UI, or clear browser storage and reload.
+
+**2. Unconfirmed user — confirm via CLI:**
+
+```bash
+aws cognito-idp admin-confirm-sign-up \
+  --user-pool-id "$(terraform output -raw cognito_user_pool_id)" \
+  --username "user@example.com"
+```
+
+**3. Wrong client ID — verify the config:**
+
+```bash
+terraform output cognito_client_id
+```
+
+Compare this value with what the web UI is using in its configuration. The client ID is injected during Amplify deployment.
+
+**4. Missing group membership — add user to group:**
+
+```bash
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id "$(terraform output -raw cognito_user_pool_id)" \
+  --username "user@example.com" \
+  --group-name "authorized-users"
+```
+
+<Aside type="tip">
+The auto-created admin user (from Terraform) is already confirmed and in the correct group. Manual users need both confirmation and group assignment.
+</Aside>
+
+### Verification
+
+After fixing, sign in again and make a test query. A successful response (200 status) confirms authentication is working. Check the browser Network tab for the `Authorization` header being sent with requests.
+
+## Lambda cold start delays
+
+### Symptom
+
+The first query after a period of inactivity takes 5–15 seconds to respond. Subsequent queries respond in 1–3 seconds.
+
+### Root cause
+
+<Tooltip term="lambda" label="Lambda" /> functions that have been idle are shut down by the service. The next invocation requires initializing a new execution environment — downloading the deployment package, starting the Python runtime, and importing libraries. This is called a "cold start."
+
+The query function imports boto3, the RAG library, and initializes Bedrock clients during cold start, which adds latency.
+
+### Fix
+
+This is expected behavior and not an error. No fix is required unless response time is critical for your use case.
+
+If you need consistently fast responses:
+
+- **Provisioned concurrency** — keeps a set number of environments warm (adds cost)
+- **Scheduled warming** — use <Tooltip term="eventbridge" label="EventBridge" /> to invoke the function periodically with a no-op payload
+
+<Aside type="note">
+Cold starts typically add 3–8 seconds for Python Lambda functions with moderate dependencies. This only affects the first request after idle time.
+</Aside>
+
+### Verification
+
+Invoke the function twice in quick succession. The second invocation should be significantly faster, confirming the first was a cold start:
+
+```bash
+# First call (may be cold)
+time curl -s "$(terraform output -raw api_endpoint)/status"
+
+# Second call (warm)
+time curl -s "$(terraform output -raw api_endpoint)/status"
+```
+
+## Terraform state issues
+
+### Symptom
+
+<Tooltip term="terraform" label="Terraform" /> commands fail with errors such as:
+
+- `Error acquiring the state lock`
+- `Resource already exists`
+- `Error: creating X: ConflictException`
+
+### Root cause
+
+<table>
+  <thead>
+    <tr>
+      <th>Error</th>
+      <th>Cause</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Error acquiring the state lock</code></td>
+      <td>A previous Terraform operation was interrupted or another process holds the lock</td>
+    </tr>
+    <tr>
+      <td><code>Resource already exists</code></td>
+      <td>The resource was created outside Terraform or state was lost/corrupted</td>
+    </tr>
+    <tr>
+      <td><code>ConflictException</code></td>
+      <td>A resource with the same name already exists in AWS but is not in the Terraform state</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fix
+
+**1. State lock — force unlock (use with caution):**
+
+```bash
+terraform force-unlock LOCK_ID
+```
+
+The `LOCK_ID` is shown in the error message. Only use this if you are certain no other process is running.
+
+<Aside type="danger">
+Force-unlocking while another Terraform process is active can corrupt your state file. Verify no other operations are in progress before unlocking.
+</Aside>
+
+**2. Resource already exists — import into state:**
+
+```bash
+# Example: import an existing S3 Vectors bucket
+terraform import aws_s3vectors_vector_bucket.this "bucket-name"
+```
+
+After importing, run `terraform plan` to verify the configuration matches the existing resource.
+
+**3. Clean slate — destroy and recreate:**
+
+If state is badly corrupted, destroy remaining resources manually in the AWS console, delete the local state file, and re-run:
+
+```bash
+rm -f terraform.tfstate terraform.tfstate.backup
+terraform init
+terraform apply
+```
+
+<Aside type="caution">
+Deleting state files means Terraform loses track of all managed resources. Only do this as a last resort and after manually cleaning up AWS resources.
+</Aside>
+
+### Verification
+
+After resolving the issue, run:
+
+```bash
+terraform plan
+```
+
+A clean plan with no unexpected changes confirms the state is consistent with the deployed infrastructure.
+
+## S3 Vectors bucket creation failure
+
+### Symptom
+
+`terraform apply` fails with an error creating the <Tooltip term="vector-bucket" label="vector bucket" />:
+
+- `UnsupportedOperation` or `InvalidLocationConstraint`
+- `BucketAlreadyExists` or `BucketAlreadyOwnedByYou`
+
+### Root cause
+
+<table>
+  <thead>
+    <tr>
+      <th>Error</th>
+      <th>Cause</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>UnsupportedOperation</code></td>
+      <td><Tooltip term="s3-vectors" label="S3 Vectors" /> is not available in the selected AWS region</td>
+    </tr>
+    <tr>
+      <td><code>BucketAlreadyExists</code></td>
+      <td>S3 bucket names are globally unique — another account owns this name</td>
+    </tr>
+    <tr>
+      <td><code>BucketAlreadyOwnedByYou</code></td>
+      <td>The bucket exists in your account but in a different region or outside Terraform state</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fix
+
+**1. Region not supported — switch to a supported region:**
+
+S3 Vectors is available in select regions. Check the AWS documentation for current availability. Update your Terraform provider region:
+
+```hcl title="main.tf"
+provider "aws" {
+  region = "us-east-1"  # Confirm S3 Vectors availability
+}
+```
+
+**2. Naming conflict — use a unique bucket name:**
+
+Append a random suffix or your account ID to ensure global uniqueness:
+
+```hcl title="main.tf"
+locals {
+  vector_bucket_name = "rag-vectors-${data.aws_caller_identity.current.account_id}"
+}
+```
+
+**3. Bucket exists in your account — import it:**
+
+```bash
+terraform import aws_s3vectors_vector_bucket.this "existing-bucket-name"
+```
+
+<Aside type="tip">
+Use <code>us-east-1</code> or <code>us-west-2</code> for the best S3 Vectors feature availability. Check the AWS region table for the latest supported regions.
+</Aside>
+
+### Verification
+
+After fixing, run:
+
+```bash
+terraform apply
+```
+
+A successful apply with the vector bucket resource created (or imported) confirms the issue is resolved. Verify with:
+
+```bash
+aws s3vectors list-vector-buckets --region us-east-1
+```
