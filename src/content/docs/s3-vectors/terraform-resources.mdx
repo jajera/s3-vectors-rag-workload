@@ -3,7 +3,7 @@ title: Terraform Resources
 description: How to provision S3 Vectors infrastructure with Terraform.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
 ## Provider requirement
 
@@ -67,22 +67,30 @@ resource "aws_s3vectors_index" "this" {
   </thead>
   <tbody>
     <tr>
-      <td><code>vector_bucket_name</code></td>
+      <td>
+        <code>vector_bucket_name</code>
+      </td>
       <td>Output</td>
       <td>The bucket name (used in API calls)</td>
     </tr>
     <tr>
-      <td><code>vector_bucket_arn</code></td>
+      <td>
+        <code>vector_bucket_arn</code>
+      </td>
       <td>Output</td>
       <td>Full ARN (used in IAM policies)</td>
     </tr>
     <tr>
-      <td><code>index_name</code></td>
+      <td>
+        <code>index_name</code>
+      </td>
       <td>Output</td>
       <td>Index name (used in API calls)</td>
     </tr>
     <tr>
-      <td><code>index_arn</code></td>
+      <td>
+        <code>index_arn</code>
+      </td>
       <td>Output</td>
       <td>Full ARN of the index</td>
     </tr>
@@ -90,7 +98,8 @@ resource "aws_s3vectors_index" "this" {
 </table>
 
 <Aside type="tip">
-Reference <code>aws_s3vectors_vector_bucket.this.vector_bucket_arn</code> in IAM policies — scope permissions to <code>{'${arn}/*'}</code> to cover all indexes.
+  Reference <code>aws_s3vectors_vector_bucket.this.vector_bucket_arn</code> in IAM policies — scope
+  permissions to <code>{"${arn}/*"}</code> to cover all indexes.
 </Aside>
 
 ## Variables for flexibility

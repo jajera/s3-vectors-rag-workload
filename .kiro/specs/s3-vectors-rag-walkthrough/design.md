@@ -100,16 +100,16 @@ Record<string, string> mapping term keys to one-sentence definitions. Currently 
 
 All technical content comes from terraform-aws-s3-vectors-rag-demo:
 
-| Content | Source file |
-| ------- | ----------- |
-| S3 Vectors Terraform | s3_vectors.tf |
-| IAM policies | lambda_ingest.tf, lambda_query.tf |
-| Vector operations code | rag/ingest.py, rag/query.py |
-| Embedding logic | rag/ingest.py, rag/fetch.py |
-| Scoring formula | rag/query.py |
-| Architecture diagram | README.md |
-| Deployment steps | README.md |
-| Cognito setup | cognito.tf, README.md |
+| Content                | Source file                       |
+| ---------------------- | --------------------------------- |
+| S3 Vectors Terraform   | s3_vectors.tf                     |
+| IAM policies           | lambda_ingest.tf, lambda_query.tf |
+| Vector operations code | rag/ingest.py, rag/query.py       |
+| Embedding logic        | rag/ingest.py, rag/fetch.py       |
+| Scoring formula        | rag/query.py                      |
+| Architecture diagram   | README.md                         |
+| Deployment steps       | README.md                         |
+| Cognito setup          | cognito.tf, README.md             |
 
 ## Publishing Status
 
@@ -126,15 +126,16 @@ All technical content comes from terraform-aws-s3-vectors-rag-demo:
 
 ### Draft (draft:true, NOT in sidebar)
 
-- rag-pipeline/* (5 pages)
-- deployment/* (4 pages)
+- rag-pipeline/\* (5 pages)
+- deployment/\* (4 pages)
 - teardown.mdx
-- troubleshooting/* (3 pages)
+- troubleshooting/\* (3 pages)
 - reference.mdx
 
 ## Deployment
 
 GitHub Actions workflow on push to main:
+
 1. Checkout
 2. withastro/action@v6 — install, build, upload
 3. actions/deploy-pages@v5 — deploy to GitHub Pages

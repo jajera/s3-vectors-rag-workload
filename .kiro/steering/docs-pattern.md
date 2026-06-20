@@ -41,14 +41,14 @@ Use on first occurrence of a glossary term per page section:
 
 ## Code blocks
 
-- Always specify language: ```hcl, ```python, ```bash, ```json
+- Always specify language: `hcl, `python, `bash, `json
 - Use `title="filename.tf"` for file-specific blocks
 - Keep blocks under 30 lines; split into multiple blocks with explanations between
 
 ## Asides
 
 ```mdx
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
 <Aside type="note">Informational content.</Aside>
 <Aside type="tip">Helpful suggestion.</Aside>

@@ -64,7 +64,7 @@ This plan implements an Astro Starlight documentation site that teaches Amazon S
 
   - [x] 3.4 Flesh out rag-pipeline/embeddings.mdx with embedding strategy
     - Document Titan V2 model, document preparation, truncation, single-chunk rationale
-    - Include code showing _bedrock_embed function
+    - Include code showing \_bedrock_embed function
     - _Requirements: 4.3_
 
   - [x] 3.5 Flesh out rag-pipeline/scoring.mdx with scoring details

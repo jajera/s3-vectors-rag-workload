@@ -6,16 +6,16 @@ Documentation for [terraform-aws-s3-vectors-rag-demo](https://github.com/jajera/
 
 An [Astro Starlight](https://starlight.astro.build/) site with concept explanations and hands-on walkthroughs covering:
 
-| Section | Content |
-| --- | --- |
-| Overview | Architecture, what S3 Vectors is, what Terraform manages |
-| Prerequisites | Tools, Bedrock model access, region selection |
-| S3 Vectors | Concepts, Terraform resources, API operations, IAM permissions |
-| RAG Pipeline | Ingest flow, query flow, embedding strategy, scoring |
-| Deployment | terraform apply, Cognito users, web UI |
-| Teardown | Destroy all resources |
-| Troubleshooting | Bedrock errors, common issues |
-| Reference | Repo layout, outputs, external links |
+| Section         | Content                                                        |
+| --------------- | -------------------------------------------------------------- |
+| Overview        | Architecture, what S3 Vectors is, what Terraform manages       |
+| Prerequisites   | Tools, Bedrock model access, region selection                  |
+| S3 Vectors      | Concepts, Terraform resources, API operations, IAM permissions |
+| RAG Pipeline    | Ingest flow, query flow, embedding strategy, scoring           |
+| Deployment      | terraform apply, Cognito users, web UI                         |
+| Teardown        | Destroy all resources                                          |
+| Troubleshooting | Bedrock errors, common issues                                  |
+| Reference       | Repo layout, outputs, external links                           |
 
 ## Quick start
 

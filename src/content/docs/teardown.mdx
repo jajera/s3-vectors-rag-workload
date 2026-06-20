@@ -3,13 +3,14 @@ title: Teardown
 description: Destroy all resources to stop billing.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 When you are done exploring the demo, destroy the infrastructure to stop all AWS charges. Because every resource is managed by <Tooltip term="terraform" label="Terraform" />, a single command removes the entire stack — no manual console cleanup required.
 
 <Aside type="caution">
-Teardown is permanent. All stored articles, vectors, user accounts, and application data are deleted and cannot be recovered.
+  Teardown is permanent. All stored articles, vectors, user accounts, and application data are
+  deleted and cannot be recovered.
 </Aside>
 
 ## Run terraform destroy
@@ -35,7 +36,8 @@ Do you really want to destroy all resources?
 Type `yes` to proceed. The destroy takes approximately 2–3 minutes.
 
 <Aside type="tip">
-To skip the interactive prompt in CI or scripted workflows, pass the <code>-auto-approve</code> flag: <code>terraform destroy -auto-approve</code>
+  To skip the interactive prompt in CI or scripted workflows, pass the <code>-auto-approve</code>{" "}
+  flag: <code>terraform destroy -auto-approve</code>
 </Aside>
 
 ## force_destroy behavior
@@ -54,18 +56,27 @@ Both S3 buckets in this project are configured with `force_destroy = true` in th
     <tr>
       <td>Standard S3 bucket</td>
       <td>All ingested article HTML files and metadata</td>
-      <td><code>aws_s3_bucket</code></td>
+      <td>
+        <code>aws_s3_bucket</code>
+      </td>
     </tr>
     <tr>
-      <td><Tooltip term="vector-bucket" label="S3 Vectors bucket" /></td>
-      <td>All stored vectors and the <Tooltip term="vector-index" label="vector index" /></td>
-      <td><code>aws_s3vectors_vector_bucket</code></td>
+      <td>
+        <Tooltip term="vector-bucket" label="S3 Vectors bucket" />
+      </td>
+      <td>
+        All stored vectors and the <Tooltip term="vector-index" label="vector index" />
+      </td>
+      <td>
+        <code>aws_s3vectors_vector_bucket</code>
+      </td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="note">
-Without <code>force_destroy = true</code>, Terraform would refuse to delete non-empty buckets and the destroy would fail. This project sets it on both buckets so teardown always succeeds cleanly.
+  Without <code>force_destroy = true</code>, Terraform would refuse to delete non-empty buckets and
+  the destroy would fail. This project sets it on both buckets so teardown always succeeds cleanly.
 </Aside>
 
 ## What gets removed
@@ -87,11 +98,15 @@ Terraform destroys resources in reverse dependency order — it removes resource
       <td>All ingested article documents (HTML content and metadata)</td>
     </tr>
     <tr>
-      <td><Tooltip term="s3-vectors" label="S3 Vectors" /> bucket + index</td>
+      <td>
+        <Tooltip term="s3-vectors" label="S3 Vectors" /> bucket + index
+      </td>
       <td>All embedding vectors — similarity search is no longer possible</td>
     </tr>
     <tr>
-      <td><Tooltip term="lambda" label="Lambda" /> functions (ingest + query)</td>
+      <td>
+        <Tooltip term="lambda" label="Lambda" /> functions (ingest + query)
+      </td>
       <td>Compute capacity for ingestion and RAG queries</td>
     </tr>
     <tr>
@@ -99,19 +114,27 @@ Terraform destroys resources in reverse dependency order — it removes resource
       <td>All Lambda execution logs</td>
     </tr>
     <tr>
-      <td><Tooltip term="api-gateway" label="API Gateway" /> HTTP API</td>
+      <td>
+        <Tooltip term="api-gateway" label="API Gateway" /> HTTP API
+      </td>
       <td>Public API endpoint and route configuration</td>
     </tr>
     <tr>
-      <td><Tooltip term="cognito" label="Cognito" /> user pool</td>
+      <td>
+        <Tooltip term="cognito" label="Cognito" /> user pool
+      </td>
       <td>All user accounts, passwords, and group memberships</td>
     </tr>
     <tr>
-      <td><Tooltip term="amplify" label="Amplify" /> app</td>
+      <td>
+        <Tooltip term="amplify" label="Amplify" /> app
+      </td>
       <td>Hosted web UI and its HTTPS domain</td>
     </tr>
     <tr>
-      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule</td>
+      <td>
+        <Tooltip term="eventbridge" label="EventBridge" /> schedule
+      </td>
       <td>Daily ingest cron trigger</td>
     </tr>
     <tr>
@@ -122,7 +145,8 @@ Terraform destroys resources in reverse dependency order — it removes resource
 </table>
 
 <Aside type="danger">
-User accounts in Cognito are permanently deleted. If you need to preserve user data, export it before running destroy.
+  User accounts in Cognito are permanently deleted. If you need to preserve user data, export it
+  before running destroy.
 </Aside>
 
 ## Verify resources are gone
@@ -149,7 +173,8 @@ aws lambda list-functions --query "Functions[?contains(FunctionName, 's3vec-rag'
 Both commands should return empty arrays (`[]`).
 
 <Aside type="tip">
-If <code>terraform show</code> still displays resources, run <code>terraform destroy</code> again. Occasional timing issues with eventual-consistency services may require a second pass.
+  If <code>terraform show</code> still displays resources, run <code>terraform destroy</code> again.
+  Occasional timing issues with eventual-consistency services may require a second pass.
 </Aside>
 
 ## Cost after teardown
@@ -157,7 +182,9 @@ If <code>terraform show</code> still displays resources, run <code>terraform des
 Once all resources are destroyed, there are no ongoing AWS charges for this demo. The project uses only pay-per-use services — with no resources provisioned, your bill is zero.
 
 <Aside type="note">
-<Tooltip term="bedrock" label="Bedrock" /> model access enablement (from the prerequisites step) remains active on your account but incurs no charges by itself. You only pay when API calls are made.
+  <Tooltip term="bedrock" label="Bedrock" /> model access enablement (from the prerequisites step)
+  remains active on your account but incurs no charges by itself. You only pay when API calls are
+  made.
 </Aside>
 
 ## Partial cleanup
@@ -173,7 +200,8 @@ terraform destroy -target=aws_scheduler_schedule.ingest
 ```
 
 <Aside type="caution">
-Targeted destroys can leave the state inconsistent. Resources that depend on removed ones may fail on the next <code>terraform apply</code>. Use full destroy and redeploy if you are unsure.
+  Targeted destroys can leave the state inconsistent. Resources that depend on removed ones may fail
+  on the next <code>terraform apply</code>. Use full destroy and redeploy if you are unsure.
 </Aside>
 
 ## Next steps

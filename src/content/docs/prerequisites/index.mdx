@@ -3,7 +3,7 @@ title: Prerequisites
 description: Tools, accounts, and access needed before deploying the S3 Vectors RAG demo.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
 ## Required tools
 
@@ -17,32 +17,44 @@ import { Aside } from '@astrojs/starlight/components';
   </thead>
   <tbody>
     <tr>
-      <td><code>terraform</code></td>
+      <td>
+        <code>terraform</code>
+      </td>
       <td>&gt;= 1.5.0</td>
       <td>Infrastructure provisioning</td>
     </tr>
     <tr>
-      <td><code>aws</code> CLI</td>
+      <td>
+        <code>aws</code> CLI
+      </td>
       <td>v2</td>
       <td>Credential configuration, manual operations</td>
     </tr>
     <tr>
-      <td><code>jq</code></td>
+      <td>
+        <code>jq</code>
+      </td>
       <td>any</td>
       <td>JSON parsing in deploy scripts</td>
     </tr>
     <tr>
-      <td><code>zip</code></td>
+      <td>
+        <code>zip</code>
+      </td>
       <td>any</td>
       <td>Amplify deployment packaging</td>
     </tr>
     <tr>
-      <td><code>curl</code></td>
+      <td>
+        <code>curl</code>
+      </td>
       <td>any</td>
       <td>Amplify deployment upload</td>
     </tr>
     <tr>
-      <td><code>python3</code></td>
+      <td>
+        <code>python3</code>
+      </td>
       <td>3.12+</td>
       <td>Local debug scripts (optional)</td>
     </tr>
@@ -50,7 +62,8 @@ import { Aside } from '@astrojs/starlight/components';
 </table>
 
 <Aside type="note">
-Docker is <strong>not</strong> required. Lambda deployment packages are built from source using Terraform's <code>archive_file</code> data source.
+  Docker is <strong>not</strong> required. Lambda deployment packages are built from source using
+  Terraform's <code>archive_file</code> data source.
 </Aside>
 
 ## AWS account requirements
@@ -68,7 +81,8 @@ The demo deploys to a single region. The default is `ap-southeast-2` (Sydney). C
 - Your preferred LLM inference profile
 
 <Aside type="caution">
-Not all regions support S3 Vectors or all Bedrock models. Verify availability before changing the region.
+  Not all regions support S3 Vectors or all Bedrock models. Verify availability before changing the
+  region.
 </Aside>
 
 ## Clone the source repo

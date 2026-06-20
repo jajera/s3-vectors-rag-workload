@@ -3,8 +3,8 @@ title: Bedrock Model Access
 description: How to enable Amazon Bedrock models required for the RAG demo.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 ## Required models
 
@@ -21,12 +21,16 @@ The demo uses two <Tooltip term="bedrock" label="Bedrock" /> models:
   <tbody>
     <tr>
       <td>Embeddings</td>
-      <td><code>amazon.titan-embed-text-v2:0</code></td>
+      <td>
+        <code>amazon.titan-embed-text-v2:0</code>
+      </td>
       <td>1024-dimensional float32 vector</td>
     </tr>
     <tr>
       <td>LLM (answer generation)</td>
-      <td><code>au.anthropic.claude-sonnet-4-5-20250929-v1:0</code></td>
+      <td>
+        <code>au.anthropic.claude-sonnet-4-5-20250929-v1:0</code>
+      </td>
       <td>Structured markdown text</td>
     </tr>
   </tbody>
@@ -45,7 +49,8 @@ The demo uses two <Tooltip term="bedrock" label="Bedrock" /> models:
 7. Wait for status to show **Access granted**
 
 <Aside type="tip">
-Model access approval is usually instant for Amazon models. Third-party models (Anthropic, Meta) may take a few minutes.
+  Model access approval is usually instant for Amazon models. Third-party models (Anthropic, Meta)
+  may take a few minutes.
 </Aside>
 
 ## Verify access
@@ -69,9 +74,11 @@ aws bedrock get-foundation-model \
 The LLM model ID (`au.anthropic.claude-sonnet-4-5-20250929-v1:0`) is an AU cross-region inference profile. This routes requests to the nearest available region (ap-southeast-2 or ap-southeast-4) for lower latency.
 
 IAM permissions must cover both:
+
 - The inference profile ARN: `arn:aws:bedrock:{region}:{account}:inference-profile/{profile_id}`
 - The underlying foundation model ARNs for each routing region
 
 <Aside type="note">
-If you change the LLM model ID in <code>terraform.tfvars</code>, ensure the IAM policy in <code>lambda_query.tf</code> covers the correct ARN patterns for your chosen model.
+  If you change the LLM model ID in <code>terraform.tfvars</code>, ensure the IAM policy in{" "}
+  <code>lambda_query.tf</code> covers the correct ARN patterns for your chosen model.
 </Aside>

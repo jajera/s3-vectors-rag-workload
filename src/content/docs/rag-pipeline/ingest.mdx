@@ -3,13 +3,15 @@ title: Ingest Pipeline
 description: How the ingest Lambda fetches RSS, embeds articles, and stores vectors in S3 Vectors.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 The ingest pipeline fetches AWS announcements from public RSS feeds, generates
-<Tooltip term="embedding" label="embeddings" /> using <Tooltip term="titan-v2" label="Titan Embeddings V2" />,
-and stores them in <Tooltip term="s3-vectors" label="S3 Vectors" /> for similarity search.
-Each run processes the full corpus and upserts vectors — making it safe to re-run at any time.
+
+<Tooltip term="embedding" label="embeddings" /> using
+<Tooltip term="titan-v2" label="Titan Embeddings V2" />, and stores them in
+<Tooltip term="s3-vectors" label="S3 Vectors" /> for similarity search. Each run processes the full
+corpus and upserts vectors — making it safe to re-run at any time.
 
 ![Ingestion pipeline — RSS fetch, HTML stripping, embedding, and PutVectors flow](/s3-vectors-rag-workload/ingestion-pipeline.png)
 
@@ -27,25 +29,42 @@ The ingest <Tooltip term="lambda" label="Lambda" /> can be invoked three ways:
   </thead>
   <tbody>
     <tr>
-      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule</td>
-      <td><code>eventbridge</code></td>
-      <td>Daily at 06:00 UTC (configurable via <code>ingest_schedule_expression</code>)</td>
+      <td>
+        <Tooltip term="eventbridge" label="EventBridge" /> schedule
+      </td>
+      <td>
+        <code>eventbridge</code>
+      </td>
+      <td>
+        Daily at 06:00 UTC (configurable via <code>ingest_schedule_expression</code>)
+      </td>
     </tr>
     <tr>
       <td>API Gateway endpoint</td>
-      <td><code>api</code></td>
-      <td>Admin sends <code>POST /ingest</code> (requires Cognito JWT in admin group)</td>
+      <td>
+        <code>api</code>
+      </td>
+      <td>
+        Admin sends <code>POST /ingest</code> (requires Cognito JWT in admin group)
+      </td>
     </tr>
     <tr>
-      <td>Bootstrap (<code>terraform apply</code>)</td>
-      <td><code>terraform</code></td>
-      <td>Runs once during initial deployment via <code>aws_lambda_invocation</code></td>
+      <td>
+        Bootstrap (<code>terraform apply</code>)
+      </td>
+      <td>
+        <code>terraform</code>
+      </td>
+      <td>
+        Runs once during initial deployment via <code>aws_lambda_invocation</code>
+      </td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="note">
-The bootstrap invocation uses a <code>lifecycle.replace_triggered_by</code> block tied to the Lambda source hash — it re-runs automatically whenever the function code changes.
+  The bootstrap invocation uses a <code>lifecycle.replace_triggered_by</code> block tied to the
+  Lambda source hash — it re-runs automatically whenever the function code changes.
 </Aside>
 
 ## Step-by-step flow
@@ -113,7 +132,8 @@ def _truncate_body(text: str) -> str:
 ```
 
 <Aside type="tip">
-Truncation splits on the last space before 8,000 characters to avoid cutting words mid-token. This keeps the embedding input clean.
+  Truncation splits on the last space before 8,000 characters to avoid cutting words mid-token. This
+  keeps the embedding input clean.
 </Aside>
 
 ## Embedding with Bedrock
@@ -143,6 +163,7 @@ def _bedrock_embed(client, model_id: str, text: str) -> list[float]:
 ```
 
 Key details:
+
 - Up to **6 retry attempts** with exponential backoff (1s, 2s, 4s, 8s, 16s, 30s max)
 - Only retries `ThrottlingException` and `ServiceUnavailableException`
 - All other errors raise immediately
@@ -187,33 +208,57 @@ Each stored vector carries metadata used during query and scoring:
   </thead>
   <tbody>
     <tr>
-      <td><code>source</code></td>
-      <td><code>aws-whats-new-a1b2c3d4.txt</code></td>
+      <td>
+        <code>source</code>
+      </td>
+      <td>
+        <code>aws-whats-new-a1b2c3d4.txt</code>
+      </td>
       <td>Loading full document from S3 at query time</td>
     </tr>
     <tr>
-      <td><code>title</code></td>
-      <td><code>Amazon S3 Vectors is now GA</code></td>
+      <td>
+        <code>title</code>
+      </td>
+      <td>
+        <code>Amazon S3 Vectors is now GA</code>
+      </td>
       <td>Display in search results and LLM context</td>
     </tr>
     <tr>
-      <td><code>url</code></td>
-      <td><code>https://aws.amazon.com/...</code></td>
+      <td>
+        <code>url</code>
+      </td>
+      <td>
+        <code>https://aws.amazon.com/...</code>
+      </td>
       <td>Citation links in generated answers</td>
     </tr>
     <tr>
-      <td><code>published</code></td>
-      <td><code>2025-06-01T12:00:00Z</code></td>
+      <td>
+        <code>published</code>
+      </td>
+      <td>
+        <code>2025-06-01T12:00:00Z</code>
+      </td>
       <td>Recency scoring (newer articles rank higher)</td>
     </tr>
     <tr>
-      <td><code>feed</code></td>
-      <td><code>aws-whats-new</code></td>
+      <td>
+        <code>feed</code>
+      </td>
+      <td>
+        <code>aws-whats-new</code>
+      </td>
       <td>Source attribution</td>
     </tr>
     <tr>
-      <td><code>chunk</code></td>
-      <td><code>0</code></td>
+      <td>
+        <code>chunk</code>
+      </td>
+      <td>
+        <code>0</code>
+      </td>
       <td>Always "0" — single-chunk strategy (one vector per article)</td>
     </tr>
   </tbody>
@@ -256,7 +301,9 @@ This marker is read by the status endpoint to report corpus freshness.
     </tr>
     <tr>
       <td>Too few articles fetched</td>
-      <td>Raise <code>RuntimeError</code> (need &ge; 5)</td>
+      <td>
+        Raise <code>RuntimeError</code> (need &ge; 5)
+      </td>
       <td>0</td>
     </tr>
     <tr>
@@ -278,7 +325,9 @@ This marker is read by the status endpoint to report corpus freshness.
 </table>
 
 <Aside type="caution">
-The Lambda timeout is set to 480 seconds (8 minutes). If Bedrock throttling is severe, the function may time out before processing all articles. Check CloudWatch logs at <code>/aws/lambda/&lt;project&gt;-&lt;env&gt;-ingest</code> for timeout indicators.
+  The Lambda timeout is set to 480 seconds (8 minutes). If Bedrock throttling is severe, the
+  function may time out before processing all articles. Check CloudWatch logs at{" "}
+  <code>/aws/lambda/&lt;project&gt;-&lt;env&gt;-ingest</code> for timeout indicators.
 </Aside>
 
 ## Related pages

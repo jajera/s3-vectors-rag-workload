@@ -3,8 +3,8 @@ title: Web UI
 description: The Amplify-hosted SPA — architecture, config injection, and redeployment.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 The briefing app ships a single-page application in the `web/` directory, hosted on <Tooltip term="amplify" label="AWS Amplify" />. Terraform handles config injection and deployment automatically — you only need to run `terraform apply`.
 
@@ -21,19 +21,27 @@ The `web/` directory contains a static frontend with no build step:
   </thead>
   <tbody>
     <tr>
-      <td><code>index.html</code></td>
+      <td>
+        <code>index.html</code>
+      </td>
       <td>Main HTML shell — loads app.js and styles.css</td>
     </tr>
     <tr>
-      <td><code>app.js</code></td>
+      <td>
+        <code>app.js</code>
+      </td>
       <td>Application logic — auth flow, API calls, rendering</td>
     </tr>
     <tr>
-      <td><code>styles.css</code></td>
+      <td>
+        <code>styles.css</code>
+      </td>
       <td>UI styling</td>
     </tr>
     <tr>
-      <td><code>config.template.js</code></td>
+      <td>
+        <code>config.template.js</code>
+      </td>
       <td>Configuration template with placeholders for Terraform outputs</td>
     </tr>
   </tbody>
@@ -50,7 +58,7 @@ window.APP_CONFIG = {
   apiEndpoint: "__API_ENDPOINT__",
   cognitoPoolId: "__COGNITO_POOL_ID__",
   cognitoClientId: "__COGNITO_CLIENT_ID__",
-  region: "__REGION__"
+  region: "__REGION__",
 };
 ```
 
@@ -73,7 +81,8 @@ resource "local_file" "web_config" {
 The resulting `config.js` is a plain JavaScript file that the SPA loads at runtime — no environment variables or build-time bundling needed.
 
 <Aside type="note">
-The generated `config.js` is gitignored. It only exists locally after `terraform apply` and inside the Amplify deployment artifact.
+  The generated `config.js` is gitignored. It only exists locally after `terraform apply` and inside
+  the Amplify deployment artifact.
 </Aside>
 
 ## Amplify hosting
@@ -92,7 +101,8 @@ resource "aws_amplify_branch" "main" {
 ```
 
 <Aside type="tip">
-Manual deployment means Amplify serves static files uploaded via the CLI — it does not pull from a Git repo or run a build pipeline.
+  Manual deployment means Amplify serves static files uploaded via the CLI — it does not pull from a
+  Git repo or run a build pipeline.
 </Aside>
 
 ## Deploy script
@@ -138,6 +148,7 @@ resource "null_resource" "deploy_web" {
 ```
 
 The `triggers` block re-runs the script whenever:
+
 - Any file in `web/` changes (source code updates)
 - The generated `config.js` content changes (infrastructure changes like a new API endpoint)
 
@@ -156,6 +167,7 @@ Open the URL in a browser and sign in with your Cognito credentials (see [Cognit
 ### Automatic
 
 Redeployment triggers automatically on the next `terraform apply` when:
+
 - You modify any file in the `web/` directory
 - Infrastructure changes cause `config.js` to regenerate (e.g., new API Gateway stage, different region)
 
@@ -168,6 +180,7 @@ terraform apply -replace=null_resource.deploy_web
 ```
 
 <Aside type="caution">
-The <code>-replace</code> flag destroys and recreates the resource, which re-runs the deploy script. This causes a brief period where the old deployment is torn down before the new one is live.
+  The <code>-replace</code> flag destroys and recreates the resource, which re-runs the deploy
+  script. This causes a brief period where the old deployment is torn down before the new one is
+  live.
 </Aside>
-

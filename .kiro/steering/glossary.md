@@ -15,7 +15,7 @@
 ## Usage in pages
 
 ```mdx
-import Tooltip from '@/components/Tooltip.astro';
+import Tooltip from "@/components/Tooltip.astro";
 
 <Tooltip term="s3-vectors" label="S3 Vectors" />
 ```

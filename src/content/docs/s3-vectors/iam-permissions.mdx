@@ -3,7 +3,7 @@ title: IAM Permissions
 description: Least-privilege IAM policies for S3 Vectors operations.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
 ## S3 Vectors IAM actions
 
@@ -100,5 +100,6 @@ resource "aws_iam_role_policy" "ingest_lambda" {
 ```
 
 <Aside type="caution">
-The <code>s3vectors:</code> prefix is different from <code>s3:</code>. Using <code>s3:PutObject</code> will NOT grant access to <code>PutVectors</code>.
+  The <code>s3vectors:</code> prefix is different from <code>s3:</code>. Using{" "}
+  <code>s3:PutObject</code> will NOT grant access to <code>PutVectors</code>.
 </Aside>

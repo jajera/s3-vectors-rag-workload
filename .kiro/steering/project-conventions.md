@@ -5,6 +5,7 @@
 Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
 
 Examples:
+
 - `docs: add s3 vectors concepts page`
 - `feat: add tooltip component`
 - `chore: update dependencies`

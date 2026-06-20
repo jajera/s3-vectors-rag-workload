@@ -3,8 +3,8 @@ title: Similarity Scoring
 description: Two-stage retrieval — vector search plus application-level reranking with recency decay.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 The <Tooltip term="query-vectors" label="QueryVectors" /> API returns results ranked by cosine similarity alone. That works for many use cases, but a news briefing app needs to balance relevance with freshness. This demo applies a two-stage scoring strategy: over-fetch from S3 Vectors, then rerank application-side using a weighted formula.
 
@@ -73,29 +73,39 @@ Articles with no publication date get a conservative 0.25 — enough to particip
   <tbody>
     <tr>
       <td>Today (0 days)</td>
-      <td><code>1.00</code></td>
+      <td>
+        <code>1.00</code>
+      </td>
       <td>Full recency bonus (+0.20)</td>
     </tr>
     <tr>
       <td>7 days</td>
-      <td><code>0.79</code></td>
+      <td>
+        <code>0.79</code>
+      </td>
       <td>Mild decay (+0.16)</td>
     </tr>
     <tr>
       <td>30 days</td>
-      <td><code>0.37</code></td>
+      <td>
+        <code>0.37</code>
+      </td>
       <td>Moderate decay (+0.07)</td>
     </tr>
     <tr>
       <td>90 days</td>
-      <td><code>0.05</code></td>
+      <td>
+        <code>0.05</code>
+      </td>
       <td>Near-zero bonus (+0.01)</td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="note">
-The formula is <code>e^(-age_days / 30)</code>. At 30 days the score is <code>e^(-1) ≈ 0.37</code>, not exactly 0.5 — this is steeper than a true half-life but works well for news content where a month is old.
+  The formula is <code>e^(-age_days / 30)</code>. At 30 days the score is <code>e^(-1) ≈ 0.37</code>
+  , not exactly 0.5 — this is steeper than a true half-life but works well for news content where a
+  month is old.
 </Aside>
 
 ## Combining the scores
@@ -125,17 +135,29 @@ Consider two candidates for the query "What's new with S3 Vectors?":
   <tbody>
     <tr>
       <td>Article A (today)</td>
-      <td><code>0.82</code></td>
+      <td>
+        <code>0.82</code>
+      </td>
       <td>0 days</td>
-      <td><code>1.00</code></td>
-      <td><code>0.8×0.82 + 0.2×1.00 = 0.86</code></td>
+      <td>
+        <code>1.00</code>
+      </td>
+      <td>
+        <code>0.8×0.82 + 0.2×1.00 = 0.86</code>
+      </td>
     </tr>
     <tr>
       <td>Article B (old)</td>
-      <td><code>0.91</code></td>
+      <td>
+        <code>0.91</code>
+      </td>
       <td>60 days</td>
-      <td><code>0.14</code></td>
-      <td><code>0.8×0.91 + 0.2×0.14 = 0.76</code></td>
+      <td>
+        <code>0.14</code>
+      </td>
+      <td>
+        <code>0.8×0.91 + 0.2×0.14 = 0.76</code>
+      </td>
     </tr>
   </tbody>
 </table>
@@ -174,7 +196,8 @@ selected = candidates[:desired_top_k]
 ```
 
 <Aside type="tip">
-Over-fetching is cheap — S3 Vectors returns results in single-digit milliseconds. The reranking step adds negligible latency but significantly improves answer quality for time-sensitive queries.
+  Over-fetching is cheap — S3 Vectors returns results in single-digit milliseconds. The reranking
+  step adds negligible latency but significantly improves answer quality for time-sensitive queries.
 </Aside>
 
 ## Why rerank application-side?
