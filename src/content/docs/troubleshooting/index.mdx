@@ -3,8 +3,8 @@ title: Troubleshooting
 description: Common issues and how to resolve them.
 ---
 
-import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside, LinkCard, CardGrid } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 When something isn't working, start here. This page covers the fastest diagnostic checks, then guides you to the right sub-page based on the symptom you're seeing.
 
@@ -19,7 +19,9 @@ Run through these first — they catch the majority of issues:
 5. **Terraform apply finished cleanly?** — Partial applies leave resources in inconsistent states. Check for errors in the apply output.
 
 <Aside type="tip">
-Most problems fall into two buckets: missing Bedrock model access (causes <code>AccessDeniedException</code>) or the ingest Lambda not completing (causes empty query results).
+  Most problems fall into two buckets: missing Bedrock model access (causes{" "}
+  <code>AccessDeniedException</code>) or the ingest Lambda not completing (causes empty query
+  results).
 </Aside>
 
 ## Symptom-based navigation
@@ -36,37 +38,63 @@ Use the table below to find the right troubleshooting path based on what you're 
   </thead>
   <tbody>
     <tr>
-      <td>Deployment failed (<code>terraform apply</code> errors)</td>
+      <td>
+        Deployment failed (<code>terraform apply</code> errors)
+      </td>
       <td>Missing permissions, region not supported, or resource limits</td>
-      <td>Check Terraform output; see <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a></td>
+      <td>
+        Check Terraform output; see{" "}
+        <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a>
+      </td>
     </tr>
     <tr>
       <td>Query returns empty results</td>
       <td>Corpus not ingested, time filter too narrow, or vector index empty</td>
-      <td>Check corpus status below; see <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a></td>
+      <td>
+        Check corpus status below; see{" "}
+        <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a>
+      </td>
     </tr>
     <tr>
-      <td><code>AccessDeniedException</code> errors</td>
+      <td>
+        <code>AccessDeniedException</code> errors
+      </td>
       <td>Bedrock model access not enabled or IAM policy missing permissions</td>
-      <td>See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a></td>
+      <td>
+        See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a>
+      </td>
     </tr>
     <tr>
       <td>Web UI not loading or blank page</td>
-      <td><Tooltip term="amplify" label="Amplify" /> deployment incomplete or CORS mismatch</td>
-      <td>Check Amplify console and CORS config; see <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a></td>
+      <td>
+        <Tooltip term="amplify" label="Amplify" /> deployment incomplete or CORS mismatch
+      </td>
+      <td>
+        Check Amplify console and CORS config; see{" "}
+        <a href="/s3-vectors-rag-workload/troubleshooting/common-issues/">Common Issues</a>
+      </td>
     </tr>
     <tr>
       <td>Ingest Lambda timeout</td>
       <td>Bedrock throttling or slow RSS feeds exceeding 480s limit</td>
-      <td>See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a> (throttling section)</td>
+      <td>
+        See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a>{" "}
+        (throttling section)
+      </td>
     </tr>
     <tr>
-      <td><code>ThrottlingException</code> from Bedrock</td>
+      <td>
+        <code>ThrottlingException</code> from Bedrock
+      </td>
       <td>Too many concurrent embedding or LLM requests</td>
-      <td>See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a></td>
+      <td>
+        See <a href="/s3-vectors-rag-workload/troubleshooting/bedrock-errors/">Bedrock Errors</a>
+      </td>
     </tr>
     <tr>
-      <td>401 / 403 from <Tooltip term="api-gateway" label="API Gateway" /></td>
+      <td>
+        401 / 403 from <Tooltip term="api-gateway" label="API Gateway" />
+      </td>
       <td>Expired or invalid JWT token, user not confirmed</td>
       <td>Re-authenticate; check Cognito user status</td>
     </tr>
@@ -95,7 +123,8 @@ aws logs tail "/aws/lambda/$(terraform output -raw query_function_name)" --follo
 ```
 
 <Aside type="note">
-Replace the Terraform output commands with your actual function names if you're not running from the Terraform workspace directory.
+  Replace the Terraform output commands with your actual function names if you're not running from
+  the Terraform workspace directory.
 </Aside>
 
 ## Checking corpus status
@@ -129,7 +158,9 @@ cat /tmp/ingest-out.json | jq .
 ```
 
 <Aside type="caution">
-The bootstrap ingest runs automatically during <code>terraform apply</code> via a <Tooltip term="lambda" label="Lambda" /> invocation resource. If it failed during apply, you'll need to invoke it manually.
+  The bootstrap ingest runs automatically during <code>terraform apply</code> via a{" "}
+  <Tooltip term="lambda" label="Lambda" /> invocation resource. If it failed during apply, you'll
+  need to invoke it manually.
 </Aside>
 
 ## Detailed troubleshooting pages

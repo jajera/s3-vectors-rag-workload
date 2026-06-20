@@ -3,8 +3,8 @@ title: Terraform Apply
 description: Step-by-step deployment of the RAG infrastructure.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 This page walks through the complete deployment process — from cloning the source repo to verifying your running application. The entire stack deploys in a single <Tooltip term="terraform" label="Terraform" /> apply that takes around 3–5 minutes.
 
@@ -39,7 +39,8 @@ rss_feeds = [
 ```
 
 <Aside type="note">
-The <code>cognito_admin_email</code> receives a temporary password after deployment. Use a real email address you can access.
+  The <code>cognito_admin_email</code> receives a temporary password after deployment. Use a real
+  email address you can access.
 </Aside>
 
 ### Variable reference
@@ -54,42 +55,72 @@ The <code>cognito_admin_email</code> receives a temporary password after deploym
   </thead>
   <tbody>
     <tr>
-      <td><code>project</code></td>
+      <td>
+        <code>project</code>
+      </td>
       <td>Yes</td>
       <td>Name prefix for all AWS resources (keep short, lowercase, no spaces)</td>
     </tr>
     <tr>
-      <td><code>environment</code></td>
+      <td>
+        <code>environment</code>
+      </td>
       <td>Yes</td>
-      <td>Deployment environment label (e.g., <code>dev</code>, <code>staging</code>, <code>prod</code>)</td>
+      <td>
+        Deployment environment label (e.g., <code>dev</code>, <code>staging</code>,{" "}
+        <code>prod</code>)
+      </td>
     </tr>
     <tr>
-      <td><code>aws_region</code></td>
+      <td>
+        <code>aws_region</code>
+      </td>
       <td>Yes</td>
-      <td>AWS region — must support both <Tooltip term="s3-vectors" label="S3 Vectors" /> and <Tooltip term="bedrock" label="Bedrock" /></td>
+      <td>
+        AWS region — must support both <Tooltip term="s3-vectors" label="S3 Vectors" /> and{" "}
+        <Tooltip term="bedrock" label="Bedrock" />
+      </td>
     </tr>
     <tr>
-      <td><code>cognito_admin_email</code></td>
+      <td>
+        <code>cognito_admin_email</code>
+      </td>
       <td>Yes</td>
-      <td>Email for the auto-created admin user in <Tooltip term="cognito" label="Cognito" /></td>
+      <td>
+        Email for the auto-created admin user in <Tooltip term="cognito" label="Cognito" />
+      </td>
     </tr>
     <tr>
-      <td><code>rss_feeds</code></td>
+      <td>
+        <code>rss_feeds</code>
+      </td>
       <td>Yes</td>
       <td>List of RSS feed URLs to ingest into the vector store</td>
     </tr>
     <tr>
-      <td><code>ingest_schedule_expression</code></td>
+      <td>
+        <code>ingest_schedule_expression</code>
+      </td>
       <td>No</td>
-      <td><Tooltip term="eventbridge" label="EventBridge" /> schedule expression (default: <code>cron(0 6 * * ? *)</code> — daily at 06:00 UTC)</td>
+      <td>
+        <Tooltip term="eventbridge" label="EventBridge" /> schedule expression (default:{" "}
+        <code>cron(0 6 * * ? *)</code> — daily at 06:00 UTC)
+      </td>
     </tr>
     <tr>
-      <td><code>embedding_model_id</code></td>
+      <td>
+        <code>embedding_model_id</code>
+      </td>
       <td>No</td>
-      <td><Tooltip term="embedding-model" label="Embedding model" /> ID (default: <code>amazon.titan-embed-text-v2:0</code>)</td>
+      <td>
+        <Tooltip term="embedding-model" label="Embedding model" /> ID (default:{" "}
+        <code>amazon.titan-embed-text-v2:0</code>)
+      </td>
     </tr>
     <tr>
-      <td><code>inference_profile_id</code></td>
+      <td>
+        <code>inference_profile_id</code>
+      </td>
       <td>No</td>
       <td>Bedrock inference profile for the LLM (default: Claude via cross-region profile)</td>
     </tr>
@@ -97,7 +128,8 @@ The <code>cognito_admin_email</code> receives a temporary password after deploym
 </table>
 
 <Aside type="caution">
-Choose a region that supports both S3 Vectors and the Bedrock models you need. As of mid-2025, <code>us-east-1</code> and <code>us-west-2</code> are recommended.
+  Choose a region that supports both S3 Vectors and the Bedrock models you need. As of mid-2025,{" "}
+  <code>us-east-1</code> and <code>us-west-2</code> are recommended.
 </Aside>
 
 ## Initialize Terraform
@@ -130,7 +162,7 @@ terraform plan
 This shows the full list of resources to be provisioned without making any changes. Expect around 40–50 resources including <Tooltip term="lambda" label="Lambda" /> functions, <Tooltip term="api-gateway" label="API Gateway" /> routes, IAM roles, and the <Tooltip term="amplify" label="Amplify" /> app.
 
 <Aside type="tip">
-Review the plan output to confirm your region and project name are correct before applying.
+  Review the plan output to confirm your region and project name are correct before applying.
 </Aside>
 
 ## Apply the configuration
@@ -156,7 +188,8 @@ Terraform provisions resources in this sequence:
 7. **Bootstrap** — A `null_resource` provisioner triggers the initial ingest, embedding ~120 articles into the vector store
 
 <Aside type="note">
-The bootstrap ingest runs automatically as part of the apply. You will have searchable content immediately after deployment completes.
+  The bootstrap ingest runs automatically as part of the apply. You will have searchable content
+  immediately after deployment completes.
 </Aside>
 
 ## Verify outputs
@@ -186,34 +219,48 @@ terraform output -raw cognito_user_pool_id
   </thead>
   <tbody>
     <tr>
-      <td><code>app_url</code></td>
+      <td>
+        <code>app_url</code>
+      </td>
       <td>Amplify HTTPS URL for the web UI — open this in your browser</td>
     </tr>
     <tr>
-      <td><code>api_endpoint</code></td>
+      <td>
+        <code>api_endpoint</code>
+      </td>
       <td>API Gateway base URL for the query and ingest endpoints</td>
     </tr>
     <tr>
-      <td><code>cognito_user_pool_id</code></td>
+      <td>
+        <code>cognito_user_pool_id</code>
+      </td>
       <td>Cognito user pool ID (needed for CLI user management)</td>
     </tr>
     <tr>
-      <td><code>cognito_client_id</code></td>
+      <td>
+        <code>cognito_client_id</code>
+      </td>
       <td>SPA client ID used by the frontend for authentication</td>
     </tr>
     <tr>
-      <td><code>vector_bucket_name</code></td>
+      <td>
+        <code>vector_bucket_name</code>
+      </td>
       <td>The S3 Vectors bucket name (useful for debugging)</td>
     </tr>
     <tr>
-      <td><code>ingest_function_name</code></td>
+      <td>
+        <code>ingest_function_name</code>
+      </td>
       <td>Ingest Lambda function name (for manual invocations or log inspection)</td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="tip">
-Copy the <code>app_url</code> and open it in your browser. You will need the Cognito credentials (sent to your admin email) to log in. See the <a href="/s3-vectors-rag-workload/deployment/cognito-users/">Cognito Users</a> page for details.
+  Copy the <code>app_url</code> and open it in your browser. You will need the Cognito credentials
+  (sent to your admin email) to log in. See the{" "}
+  <a href="/s3-vectors-rag-workload/deployment/cognito-users/">Cognito Users</a> page for details.
 </Aside>
 
 ## Next steps

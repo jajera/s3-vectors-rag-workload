@@ -3,12 +3,15 @@ title: RAG Pipeline
 description: Overview of the Retrieval-Augmented Generation pipeline — ingest, embed, store, search, generate.
 ---
 
-import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside, LinkCard, CardGrid } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 ## What is RAG?
 
-<Tooltip term="rag" label="Retrieval-Augmented Generation" /> (RAG) is a pattern that combines vector similarity search with LLM generation. Instead of relying solely on a model's training data, RAG retrieves relevant source documents at query time and feeds them as context to the <Tooltip term="llm" label="LLM" />.
+<Tooltip term="rag" label="Retrieval-Augmented Generation" /> (RAG) is a pattern that combines
+vector similarity search with LLM generation. Instead of relying solely on a model's training data,
+RAG retrieves relevant source documents at query time and feeds them as context to the
+<Tooltip term="llm" label="LLM" />.
 
 The result: answers that are grounded in real data, cite their sources, and stay current without retraining.
 
@@ -26,27 +29,37 @@ A pure LLM generates answers from its training data alone. This works for genera
   </thead>
   <tbody>
     <tr>
-      <td><strong>Freshness</strong></td>
+      <td>
+        <strong>Freshness</strong>
+      </td>
       <td>Frozen at training cutoff</td>
       <td>As current as ingested documents</td>
     </tr>
     <tr>
-      <td><strong>Accuracy</strong></td>
+      <td>
+        <strong>Accuracy</strong>
+      </td>
       <td>May hallucinate confidently</td>
       <td>Grounded in retrieved source text</td>
     </tr>
     <tr>
-      <td><strong>Verifiability</strong></td>
+      <td>
+        <strong>Verifiability</strong>
+      </td>
       <td>No source attribution</td>
       <td>Cites specific documents with URLs</td>
     </tr>
     <tr>
-      <td><strong>Cost</strong></td>
+      <td>
+        <strong>Cost</strong>
+      </td>
       <td>Requires fine-tuning for new data</td>
       <td>Add documents without retraining</td>
     </tr>
     <tr>
-      <td><strong>Private data</strong></td>
+      <td>
+        <strong>Private data</strong>
+      </td>
       <td>Not available unless fine-tuned</td>
       <td>Works with any ingested corpus</td>
     </tr>
@@ -54,7 +67,9 @@ A pure LLM generates answers from its training data alone. This works for genera
 </table>
 
 <Aside type="tip">
-RAG is particularly effective when your data changes frequently. This demo ingests AWS announcements daily — the LLM can answer questions about announcements published yesterday without any model changes.
+  RAG is particularly effective when your data changes frequently. This demo ingests AWS
+  announcements daily — the LLM can answer questions about announcements published yesterday without
+  any model changes.
 </Aside>
 
 ## Pipeline phases
@@ -93,42 +108,60 @@ Retrieved documents are scored, ranked, and assembled into a context window. The
   </thead>
   <tbody>
     <tr>
-      <td><strong>Ingest Lambda</strong></td>
+      <td>
+        <strong>Ingest Lambda</strong>
+      </td>
       <td>Fetches RSS, prepares documents, embeds, stores vectors</td>
       <td>AWS Lambda</td>
     </tr>
     <tr>
-      <td><strong>Query Lambda</strong></td>
+      <td>
+        <strong>Query Lambda</strong>
+      </td>
       <td>Embeds question, searches vectors, builds context, calls LLM</td>
       <td>AWS Lambda</td>
     </tr>
     <tr>
-      <td><strong>S3 Vectors</strong></td>
+      <td>
+        <strong>S3 Vectors</strong>
+      </td>
       <td>Stores and searches 1024-dim embeddings with metadata</td>
       <td>Amazon S3 Vectors</td>
     </tr>
     <tr>
-      <td><strong>S3 (documents)</strong></td>
+      <td>
+        <strong>S3 (documents)</strong>
+      </td>
       <td>Stores full article text for context retrieval</td>
       <td>Amazon S3</td>
     </tr>
     <tr>
-      <td><strong>Bedrock (Titan V2)</strong></td>
+      <td>
+        <strong>Bedrock (Titan V2)</strong>
+      </td>
       <td>Generates embeddings for both documents and queries</td>
       <td>Amazon Bedrock</td>
     </tr>
     <tr>
-      <td><strong>Bedrock (Claude)</strong></td>
+      <td>
+        <strong>Bedrock (Claude)</strong>
+      </td>
       <td>Generates structured answers from retrieved context</td>
       <td>Amazon Bedrock</td>
     </tr>
     <tr>
-      <td><strong>API Gateway</strong></td>
+      <td>
+        <strong>API Gateway</strong>
+      </td>
       <td>Routes authenticated requests to Query Lambda</td>
       <td>Amazon API Gateway</td>
     </tr>
     <tr>
-      <td><strong><Tooltip term="eventbridge" label="EventBridge" /></strong></td>
+      <td>
+        <strong>
+          <Tooltip term="eventbridge" label="EventBridge" />
+        </strong>
+      </td>
       <td>Triggers daily corpus refresh</td>
       <td>Amazon EventBridge</td>
     </tr>
@@ -153,7 +186,8 @@ A complete request lifecycle:
 10. Response returns to the browser with answer and source links
 
 <Aside type="note">
-The same embedding model must be used for both ingest and query. If you change models, existing vectors become incompatible and the index must be rebuilt.
+  The same embedding model must be used for both ingest and query. If you change models, existing
+  vectors become incompatible and the index must be rebuilt.
 </Aside>
 
 ## Explore the pipeline

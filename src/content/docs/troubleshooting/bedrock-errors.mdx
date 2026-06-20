@@ -3,8 +3,8 @@ title: Bedrock Errors
 description: AccessDeniedException, throttling, and model availability issues.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 This page covers common <Tooltip term="bedrock" label="Amazon Bedrock" /> errors you may encounter when running the ingest or query <Tooltip term="lambda" label="Lambda" /> functions. Each section shows what the error looks like in CloudWatch, explains the root causes, and provides step-by-step resolution.
 
@@ -32,19 +32,32 @@ with the specified model ID.
   <tbody>
     <tr>
       <td>Model access not enabled</td>
-      <td>The <Tooltip term="embedding-model" label="Titan Embeddings V2" /> or LLM has not been enabled in the Bedrock console for your account and region.</td>
+      <td>
+        The <Tooltip term="embedding-model" label="Titan Embeddings V2" /> or LLM has not been
+        enabled in the Bedrock console for your account and region.
+      </td>
     </tr>
     <tr>
-      <td>IAM policy missing <code>bedrock:InvokeModel</code></td>
-      <td>The Lambda execution role does not include the <code>bedrock:InvokeModel</code> action for the model ARN.</td>
+      <td>
+        IAM policy missing <code>bedrock:InvokeModel</code>
+      </td>
+      <td>
+        The Lambda execution role does not include the <code>bedrock:InvokeModel</code> action for
+        the model ARN.
+      </td>
     </tr>
     <tr>
       <td>Wrong region</td>
       <td>The Lambda is deployed in a region where the model is not available or not enabled.</td>
     </tr>
     <tr>
-      <td><Tooltip term="inference-profile" label="Inference profile" /> not available</td>
-      <td>Cross-region inference profiles require model access enabled in ALL regions the profile routes to.</td>
+      <td>
+        <Tooltip term="inference-profile" label="Inference profile" /> not available
+      </td>
+      <td>
+        Cross-region inference profiles require model access enabled in ALL regions the profile
+        routes to.
+      </td>
     </tr>
   </tbody>
 </table>
@@ -115,7 +128,8 @@ A 200 response with no error key confirms the fix worked.
 
 ## ThrottlingException
 
-<Tooltip term="bedrock" label="Bedrock" /> enforces per-model, per-account rate limits (tokens per minute and requests per minute).
+<Tooltip term="bedrock" label="Bedrock" /> enforces per-model, per-account rate limits (tokens per
+minute and requests per minute).
 
 ### What you see in CloudWatch
 
@@ -137,11 +151,17 @@ before trying again.
   <tbody>
     <tr>
       <td>Burst during batch ingest</td>
-      <td>Ingesting many documents at once exceeds the default requests-per-minute quota for <Tooltip term="titan-v2" label="Titan V2" />.</td>
+      <td>
+        Ingesting many documents at once exceeds the default requests-per-minute quota for{" "}
+        <Tooltip term="titan-v2" label="Titan V2" />.
+      </td>
     </tr>
     <tr>
       <td>Account-level quota too low</td>
-      <td>Default Bedrock quotas are conservative for new accounts (e.g., 100 RPM for embedding models).</td>
+      <td>
+        Default Bedrock quotas are conservative for new accounts (e.g., 100 RPM for embedding
+        models).
+      </td>
     </tr>
     <tr>
       <td>Concurrent Lambda invocations</td>
@@ -155,7 +175,8 @@ before trying again.
 The ingest Lambda includes exponential backoff with jitter — up to 6 retry attempts. Most transient throttling resolves within retries.
 
 <Aside type="note">
-If you see ThrottlingException in logs but the function completes successfully, the retries handled it. Only investigate if the function returns an error or times out.
+  If you see ThrottlingException in logs but the function completes successfully, the retries
+  handled it. Only investigate if the function returns an error or times out.
 </Aside>
 
 ### Step-by-step resolution
@@ -183,7 +204,8 @@ aws service-quotas get-service-quota \
 ```
 
 <Aside type="tip">
-Find the exact quota code in the Service Quotas console under Amazon Bedrock → Titan Embeddings V2 model invocations.
+  Find the exact quota code in the Service Quotas console under Amazon Bedrock → Titan Embeddings V2
+  model invocations.
 </Aside>
 
 3. **Request a quota increase:**
@@ -250,15 +272,23 @@ at 'body.inputText' failed to satisfy constraint: Member must not be null
   <tbody>
     <tr>
       <td>Empty input text</td>
-      <td>An empty string or None was passed as <code>inputText</code> to the embedding model.</td>
+      <td>
+        An empty string or None was passed as <code>inputText</code> to the embedding model.
+      </td>
     </tr>
     <tr>
       <td>Text exceeds token limit</td>
-      <td>Titan Embeddings V2 supports up to 8,192 tokens per input. Very long documents without truncation will fail.</td>
+      <td>
+        Titan Embeddings V2 supports up to 8,192 tokens per input. Very long documents without
+        truncation will fail.
+      </td>
     </tr>
     <tr>
       <td>Malformed request body</td>
-      <td>Missing required fields, wrong data types, or invalid JSON in the <code>InvokeModel</code> body.</td>
+      <td>
+        Missing required fields, wrong data types, or invalid JSON in the <code>InvokeModel</code>{" "}
+        body.
+      </td>
     </tr>
   </tbody>
 </table>
@@ -278,7 +308,9 @@ aws logs filter-log-events \
 
 2. **Verify text length:**
 
-<Tooltip term="titan-v2" label="Titan Embeddings V2" /> accepts up to 8,192 tokens (roughly 30,000 characters of English text). The ingest function truncates content before embedding. If you see this error, confirm the truncation logic is working:
+<Tooltip term="titan-v2" label="Titan Embeddings V2" /> accepts up to 8,192 tokens (roughly 30,000
+characters of English text). The ingest function truncates content before embedding. If you see this
+error, confirm the truncation logic is working:
 
 ```bash
 aws logs filter-log-events \
@@ -302,7 +334,8 @@ The correct format for Titan Embeddings V2:
 Ensure `inputText` is a non-empty string, `dimensions` is an integer, and `normalize` is a boolean.
 
 <Aside type="caution">
-If an RSS feed item has no content (only a title), the ingest function may pass an empty string to the embedding model. The code should skip items with empty body text.
+  If an RSS feed item has no content (only a title), the ingest function may pass an empty string to
+  the embedding model. The code should skip items with empty body text.
 </Aside>
 
 ### Verify the fix
@@ -345,7 +378,10 @@ inference requests. Please wait and try again.
     </tr>
     <tr>
       <td>Deployed too quickly after enabling</td>
-      <td>Running <code>terraform apply</code> immediately after enabling model access may hit this window.</td>
+      <td>
+        Running <code>terraform apply</code> immediately after enabling model access may hit this
+        window.
+      </td>
     </tr>
   </tbody>
 </table>
@@ -362,7 +398,9 @@ aws bedrock get-foundation-model-availability \
 ```
 
 <Aside type="tip">
-If you are deploying via Terraform for the first time, enable model access in the Bedrock console at least 10 minutes before running <code>terraform apply</code>. This avoids the Lambda bootstrapping against an unavailable model.
+  If you are deploying via Terraform for the first time, enable model access in the Bedrock console
+  at least 10 minutes before running <code>terraform apply</code>. This avoids the Lambda
+  bootstrapping against an unavailable model.
 </Aside>
 
 3. **Retry the Lambda:** The built-in retry logic will handle this if the delay is short. For longer delays, manually invoke after waiting:
@@ -443,7 +481,8 @@ aws logs filter-log-events \
 ```
 
 <Aside type="note">
-If ServiceUnavailableException persists for more than 30 minutes and no AWS Health event is reported, open an AWS Support case.
+  If ServiceUnavailableException persists for more than 30 minutes and no AWS Health event is
+  reported, open an AWS Support case.
 </Aside>
 
 ### Verify the fix
@@ -489,15 +528,24 @@ inference profile 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.i
   <tbody>
     <tr>
       <td>Wrong model ID</td>
-      <td>Typo in the model identifier (e.g., <code>amazon.titan-embed-text-v2</code> instead of <code>amazon.titan-embed-text-v2:0</code>).</td>
+      <td>
+        Typo in the model identifier (e.g., <code>amazon.titan-embed-text-v2</code> instead of{" "}
+        <code>amazon.titan-embed-text-v2:0</code>).
+      </td>
     </tr>
     <tr>
       <td>Inference profile does not exist</td>
-      <td>The ARN references a profile that was never created, was deleted, or is in a different account.</td>
+      <td>
+        The ARN references a profile that was never created, was deleted, or is in a different
+        account.
+      </td>
     </tr>
     <tr>
       <td>Model not available in region</td>
-      <td>Some models are only available in specific regions. Using a model ID in an unsupported region returns this error.</td>
+      <td>
+        Some models are only available in specific regions. Using a model ID in an unsupported
+        region returns this error.
+      </td>
     </tr>
   </tbody>
 </table>
@@ -519,7 +567,7 @@ amazon.titan-embed-text-v2:0
 ```
 
 <Aside type="caution">
-The <code>:0</code> version suffix is required. Omitting it causes a ResourceNotFoundException.
+  The <code>:0</code> version suffix is required. Omitting it causes a ResourceNotFoundException.
 </Aside>
 
 2. **Verify inference profile exists:**
@@ -539,6 +587,7 @@ grep -r "model_id" terraform.tfvars
 ```
 
 Expected values:
+
 - Embedding: `amazon.titan-embed-text-v2:0`
 - LLM inference profile: check the profile ARN in your account
 
@@ -556,4 +605,3 @@ aws lambda invoke \
 ```
 
 A successful response confirms the resource is found.
-

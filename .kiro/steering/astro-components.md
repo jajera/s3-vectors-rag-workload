@@ -30,6 +30,6 @@
 title: My Page
 ---
 
-import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Card, CardGrid, Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 ```

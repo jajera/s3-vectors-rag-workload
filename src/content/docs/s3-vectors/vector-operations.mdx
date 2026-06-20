@@ -3,8 +3,8 @@ title: Vector Operations
 description: PutVectors, QueryVectors, and GetVectors — the S3 Vectors API in action.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 ## API operations
 
@@ -38,6 +38,7 @@ s3vectors.put_vectors(
 ```
 
 Key points:
+
 - **key** must be unique within the index (used for upsert and retrieval)
 - **data** must match the index dimension exactly (1024 floats)
 - **metadata** is arbitrary — store whatever you'll need at search time
@@ -63,13 +64,15 @@ for vector in response.get("vectors", []):
 ```
 
 Key points:
+
 - **queryVector** is the embedded question (same model, same dimension)
 - **topK** controls how many results to return
 - **returnMetadata=True** includes stored metadata in results
 - Results are sorted by similarity score (highest first)
 
 <Aside type="tip">
-Over-fetch (request more than you need) and rerank application-side. This demo requests 3x the desired results and applies recency scoring before selecting the final set.
+  Over-fetch (request more than you need) and rerank application-side. This demo requests 3x the
+  desired results and applies recency scoring before selecting the final set.
 </Aside>
 
 ## GetVectors
@@ -96,5 +99,6 @@ s3vectors = boto3.client("s3vectors", region_name="ap-southeast-2")
 ```
 
 <Aside type="note">
-This is <code>s3vectors</code> — a separate service client from <code>s3</code>. Don't confuse the two.
+  This is <code>s3vectors</code> — a separate service client from <code>s3</code>. Don't confuse the
+  two.
 </Aside>

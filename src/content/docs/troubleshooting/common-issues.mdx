@@ -3,8 +3,8 @@ title: Common Issues
 description: Deployment, API, and UI troubleshooting.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 This page covers frequently encountered issues when deploying and using the RAG demo. Each section describes the symptom, root cause, step-by-step fix, and how to verify the resolution.
 
@@ -42,7 +42,8 @@ cat /tmp/ingest-out.json | python3 -m json.tool
 If throttling is the cause, wait 60 seconds and retry. The built-in backoff handles transient throttles, but sustained throttling requires multiple invocations to process the full corpus.
 
 <Aside type="tip">
-You can monitor progress in CloudWatch Logs. Filter for the function name and look for "Processed X articles" messages.
+  You can monitor progress in CloudWatch Logs. Filter for the function name and look for "Processed
+  X articles" messages.
 </Aside>
 
 ### Verification
@@ -73,7 +74,9 @@ The query endpoint returns an empty `results` array or the web UI shows "No rele
   <tbody>
     <tr>
       <td>Corpus not ingested</td>
-      <td>The <code>/status</code> endpoint returns <code>vector_count: 0</code></td>
+      <td>
+        The <code>/status</code> endpoint returns <code>vector_count: 0</code>
+      </td>
     </tr>
     <tr>
       <td>Question does not match indexed content</td>
@@ -105,7 +108,8 @@ Try a general question that should match many articles, such as "What are the la
 If your query includes a time range, try without it first. The <Tooltip term="s3-vectors" label="S3 Vectors" /> index stores article publish dates in metadata, and a narrow window can exclude all results.
 
 <Aside type="note">
-The scoring formula uses 0.8 similarity + 0.2 recency weighting. Very old articles may rank lower even if semantically relevant.
+  The scoring formula uses 0.8 similarity + 0.2 recency weighting. Very old articles may rank lower
+  even if semantically relevant.
 </Aside>
 
 ### Verification
@@ -127,7 +131,9 @@ The web UI fails to load data or submit queries.
 
 ### Root cause
 
-<Tooltip term="api-gateway" label="API Gateway" /> CORS configuration requires an exact origin match. If the <Tooltip term="amplify" label="Amplify" /> URL does not match the allowed origin configured in the API, the browser blocks the request.
+<Tooltip term="api-gateway" label="API Gateway" /> CORS configuration requires an exact origin
+match. If the <Tooltip term="amplify" label="Amplify" /> URL does not match the allowed origin
+configured in the API, the browser blocks the request.
 
 Common mismatches:
 
@@ -166,7 +172,8 @@ terraform apply -target=module.api_gateway
 ```
 
 <Aside type="caution">
-The CORS origin must match exactly — including protocol, subdomain, and no trailing slash. A single character difference causes the browser to block all API requests.
+  The CORS origin must match exactly — including protocol, subdomain, and no trailing slash. A
+  single character difference causes the browser to block all API requests.
 </Aside>
 
 ### Verification
@@ -191,19 +198,27 @@ API requests return `401 Unauthorized` or the web UI shows "Session expired" or 
   <tbody>
     <tr>
       <td>Expired JWT token</td>
-      <td><code>Token expired</code> or <code>401</code> from API Gateway</td>
+      <td>
+        <code>Token expired</code> or <code>401</code> from API Gateway
+      </td>
     </tr>
     <tr>
       <td>User not confirmed</td>
-      <td><code>UserNotConfirmedException</code> during sign-in</td>
+      <td>
+        <code>UserNotConfirmedException</code> during sign-in
+      </td>
     </tr>
     <tr>
       <td>Wrong Cognito client ID</td>
-      <td><code>ResourceNotFoundException</code> or login page shows generic error</td>
+      <td>
+        <code>ResourceNotFoundException</code> or login page shows generic error
+      </td>
     </tr>
     <tr>
       <td>User not in authorized group</td>
-      <td><code>403 Forbidden</code> from API Gateway authorizer</td>
+      <td>
+        <code>403 Forbidden</code> from API Gateway authorizer
+      </td>
     </tr>
   </tbody>
 </table>
@@ -240,7 +255,8 @@ aws cognito-idp admin-add-user-to-group \
 ```
 
 <Aside type="tip">
-The auto-created admin user (from Terraform) is already confirmed and in the correct group. Manual users need both confirmation and group assignment.
+  The auto-created admin user (from Terraform) is already confirmed and in the correct group. Manual
+  users need both confirmation and group assignment.
 </Aside>
 
 ### Verification
@@ -255,7 +271,9 @@ The first query after a period of inactivity takes 5–15 seconds to respond. Su
 
 ### Root cause
 
-<Tooltip term="lambda" label="Lambda" /> functions that have been idle are shut down by the service. The next invocation requires initializing a new execution environment — downloading the deployment package, starting the Python runtime, and importing libraries. This is called a "cold start."
+<Tooltip term="lambda" label="Lambda" /> functions that have been idle are shut down by the service.
+The next invocation requires initializing a new execution environment — downloading the deployment
+package, starting the Python runtime, and importing libraries. This is called a "cold start."
 
 The query function imports boto3, the RAG library, and initializes Bedrock clients during cold start, which adds latency.
 
@@ -269,7 +287,8 @@ If you need consistently fast responses:
 - **Scheduled warming** — use <Tooltip term="eventbridge" label="EventBridge" /> to invoke the function periodically with a no-op payload
 
 <Aside type="note">
-Cold starts typically add 3–8 seconds for Python Lambda functions with moderate dependencies. This only affects the first request after idle time.
+  Cold starts typically add 3–8 seconds for Python Lambda functions with moderate dependencies. This
+  only affects the first request after idle time.
 </Aside>
 
 ### Verification
@@ -305,15 +324,21 @@ time curl -s "$(terraform output -raw api_endpoint)/status"
   </thead>
   <tbody>
     <tr>
-      <td><code>Error acquiring the state lock</code></td>
+      <td>
+        <code>Error acquiring the state lock</code>
+      </td>
       <td>A previous Terraform operation was interrupted or another process holds the lock</td>
     </tr>
     <tr>
-      <td><code>Resource already exists</code></td>
+      <td>
+        <code>Resource already exists</code>
+      </td>
       <td>The resource was created outside Terraform or state was lost/corrupted</td>
     </tr>
     <tr>
-      <td><code>ConflictException</code></td>
+      <td>
+        <code>ConflictException</code>
+      </td>
       <td>A resource with the same name already exists in AWS but is not in the Terraform state</td>
     </tr>
   </tbody>
@@ -330,7 +355,8 @@ terraform force-unlock LOCK_ID
 The `LOCK_ID` is shown in the error message. Only use this if you are certain no other process is running.
 
 <Aside type="danger">
-Force-unlocking while another Terraform process is active can corrupt your state file. Verify no other operations are in progress before unlocking.
+  Force-unlocking while another Terraform process is active can corrupt your state file. Verify no
+  other operations are in progress before unlocking.
 </Aside>
 
 **2. Resource already exists — import into state:**
@@ -353,7 +379,8 @@ terraform apply
 ```
 
 <Aside type="caution">
-Deleting state files means Terraform loses track of all managed resources. Only do this as a last resort and after manually cleaning up AWS resources.
+  Deleting state files means Terraform loses track of all managed resources. Only do this as a last
+  resort and after manually cleaning up AWS resources.
 </Aside>
 
 ### Verification
@@ -386,16 +413,26 @@ A clean plan with no unexpected changes confirms the state is consistent with th
   </thead>
   <tbody>
     <tr>
-      <td><code>UnsupportedOperation</code></td>
-      <td><Tooltip term="s3-vectors" label="S3 Vectors" /> is not available in the selected AWS region</td>
+      <td>
+        <code>UnsupportedOperation</code>
+      </td>
+      <td>
+        <Tooltip term="s3-vectors" label="S3 Vectors" /> is not available in the selected AWS region
+      </td>
     </tr>
     <tr>
-      <td><code>BucketAlreadyExists</code></td>
+      <td>
+        <code>BucketAlreadyExists</code>
+      </td>
       <td>S3 bucket names are globally unique — another account owns this name</td>
     </tr>
     <tr>
-      <td><code>BucketAlreadyOwnedByYou</code></td>
-      <td>The bucket exists in your account but in a different region or outside Terraform state</td>
+      <td>
+        <code>BucketAlreadyOwnedByYou</code>
+      </td>
+      <td>
+        The bucket exists in your account but in a different region or outside Terraform state
+      </td>
     </tr>
   </tbody>
 </table>
@@ -429,7 +466,8 @@ terraform import aws_s3vectors_vector_bucket.this "existing-bucket-name"
 ```
 
 <Aside type="tip">
-Use <code>us-east-1</code> or <code>us-west-2</code> for the best S3 Vectors feature availability. Check the AWS region table for the latest supported regions.
+  Use <code>us-east-1</code> or <code>us-west-2</code> for the best S3 Vectors feature availability.
+  Check the AWS region table for the latest supported regions.
 </Aside>
 
 ### Verification

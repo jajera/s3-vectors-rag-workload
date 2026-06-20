@@ -3,10 +3,13 @@ title: Cognito Users
 description: Managing authentication — admin user creation and manual user management.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
-<Tooltip term="cognito" label="Amazon Cognito" /> handles user authentication for this project. The user pool uses email as the username, issues JWT tokens, and integrates with <Tooltip term="api-gateway" label="API Gateway" /> to authorize requests. This page covers the auto-created admin user, manual user management, and how group membership controls API access.
+<Tooltip term="cognito" label="Amazon Cognito" /> handles user authentication for this project. The
+user pool uses email as the username, issues JWT tokens, and integrates with
+<Tooltip term="api-gateway" label="API Gateway" /> to authorize requests. This page covers the
+auto-created admin user, manual user management, and how group membership controls API access.
 
 ## Authentication flow
 
@@ -34,7 +37,8 @@ During deployment, Terraform:
 3. Sends a temporary password to the email address
 
 <Aside type="note">
-The admin user must change their temporary password on first sign-in. Cognito enforces this with a <code>FORCE_CHANGE_PASSWORD</code> status until the user completes the challenge.
+  The admin user must change their temporary password on first sign-in. Cognito enforces this with a{" "}
+  <code>FORCE_CHANGE_PASSWORD</code> status until the user completes the challenge.
 </Aside>
 
 ## Groups and access control
@@ -51,20 +55,27 @@ The project creates a single Cognito group called **admin**. Group membership de
   </thead>
   <tbody>
     <tr>
-      <td><code>admin</code></td>
-      <td><code>POST /ingest</code> and <code>POST /query</code></td>
+      <td>
+        <code>admin</code>
+      </td>
+      <td>
+        <code>POST /ingest</code> and <code>POST /query</code>
+      </td>
       <td>Can trigger ingestion and query the system</td>
     </tr>
     <tr>
       <td>(no group)</td>
-      <td><code>POST /query</code> only</td>
+      <td>
+        <code>POST /query</code> only
+      </td>
       <td>Can query but cannot trigger ingestion</td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="tip">
-The admin group claim is included in the JWT token as <code>cognito:groups</code>. API Gateway checks this claim to authorize the <code>POST /ingest</code> route.
+  The admin group claim is included in the JWT token as <code>cognito:groups</code>. API Gateway
+  checks this claim to authorize the <code>POST /ingest</code> route.
 </Aside>
 
 ## Password requirements
@@ -108,7 +119,9 @@ aws cognito-idp admin-set-user-password \
 ```
 
 <Aside type="caution">
-The <code>--permanent</code> flag skips the forced password change on first login. Without it, the user must complete the <code>NEW_PASSWORD_REQUIRED</code> challenge before they can use the account.
+  The <code>--permanent</code> flag skips the forced password change on first login. Without it, the
+  user must complete the <code>NEW_PASSWORD_REQUIRED</code> challenge before they can use the
+  account.
 </Aside>
 
 ### Add a user to the admin group
@@ -159,7 +172,8 @@ aws cognito-idp admin-delete-user \
 ```
 
 <Aside type="caution">
-User deletion is permanent and immediate. The user loses access to all API endpoints and their tokens are invalidated.
+  User deletion is permanent and immediate. The user loses access to all API endpoints and their
+  tokens are invalidated.
 </Aside>
 
 ## Quick reference
@@ -174,31 +188,45 @@ User deletion is permanent and immediate. The user loses access to all API endpo
   <tbody>
     <tr>
       <td>Create user</td>
-      <td><code>aws cognito-idp admin-create-user</code></td>
+      <td>
+        <code>aws cognito-idp admin-create-user</code>
+      </td>
     </tr>
     <tr>
       <td>Set password</td>
-      <td><code>aws cognito-idp admin-set-user-password</code></td>
+      <td>
+        <code>aws cognito-idp admin-set-user-password</code>
+      </td>
     </tr>
     <tr>
       <td>Add to group</td>
-      <td><code>aws cognito-idp admin-add-user-to-group</code></td>
+      <td>
+        <code>aws cognito-idp admin-add-user-to-group</code>
+      </td>
     </tr>
     <tr>
       <td>Remove from group</td>
-      <td><code>aws cognito-idp admin-remove-user-from-group</code></td>
+      <td>
+        <code>aws cognito-idp admin-remove-user-from-group</code>
+      </td>
     </tr>
     <tr>
       <td>List users</td>
-      <td><code>aws cognito-idp list-users</code></td>
+      <td>
+        <code>aws cognito-idp list-users</code>
+      </td>
     </tr>
     <tr>
       <td>List group members</td>
-      <td><code>aws cognito-idp list-users-in-group</code></td>
+      <td>
+        <code>aws cognito-idp list-users-in-group</code>
+      </td>
     </tr>
     <tr>
       <td>Delete user</td>
-      <td><code>aws cognito-idp admin-delete-user</code></td>
+      <td>
+        <code>aws cognito-idp admin-delete-user</code>
+      </td>
     </tr>
   </tbody>
 </table>

@@ -3,8 +3,8 @@ title: Reference
 description: Repository layout, variables, outputs, and external links.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 Quick-reference page for the <Tooltip term="terraform" label="Terraform" />-provisioned <Tooltip term="s3-vectors" label="S3 Vectors" /> RAG demo. Use this as a lookup for repository structure, configuration variables, deployment outputs, API routes, and external documentation.
 
@@ -44,7 +44,6 @@ terraform-aws-s3-vectors-rag-demo/
 └── README.md                  # Setup instructions
 ```
 
-
 <table>
   <thead>
     <tr>
@@ -54,63 +53,113 @@ terraform-aws-s3-vectors-rag-demo/
   </thead>
   <tbody>
     <tr>
-      <td><code>main.tf</code></td>
+      <td>
+        <code>main.tf</code>
+      </td>
       <td>AWS provider configuration, random prefix, and local values</td>
     </tr>
     <tr>
-      <td><code>variables.tf</code></td>
+      <td>
+        <code>variables.tf</code>
+      </td>
       <td>All input variables with types, defaults, and validations</td>
     </tr>
     <tr>
-      <td><code>outputs.tf</code></td>
-      <td>Stack outputs exposed after <code>terraform apply</code></td>
+      <td>
+        <code>outputs.tf</code>
+      </td>
+      <td>
+        Stack outputs exposed after <code>terraform apply</code>
+      </td>
     </tr>
     <tr>
-      <td><code>s3.tf</code></td>
+      <td>
+        <code>s3.tf</code>
+      </td>
       <td>Standard S3 bucket for raw RSS document storage</td>
     </tr>
     <tr>
-      <td><code>s3_vectors.tf</code></td>
-      <td><Tooltip term="vector-bucket" label="Vector bucket" /> and <Tooltip term="vector-index" label="vector index" /> resources</td>
+      <td>
+        <code>s3_vectors.tf</code>
+      </td>
+      <td>
+        <Tooltip term="vector-bucket" label="Vector bucket" /> and{" "}
+        <Tooltip term="vector-index" label="vector index" /> resources
+      </td>
     </tr>
     <tr>
-      <td><code>lambda_ingest.tf</code></td>
-      <td>Ingest <Tooltip term="lambda" label="Lambda" /> function, IAM role, and least-privilege policy</td>
+      <td>
+        <code>lambda_ingest.tf</code>
+      </td>
+      <td>
+        Ingest <Tooltip term="lambda" label="Lambda" /> function, IAM role, and least-privilege
+        policy
+      </td>
     </tr>
     <tr>
-      <td><code>lambda_query.tf</code></td>
+      <td>
+        <code>lambda_query.tf</code>
+      </td>
       <td>Query Lambda function, IAM role, and least-privilege policy</td>
     </tr>
     <tr>
-      <td><code>api_gateway.tf</code></td>
-      <td><Tooltip term="api-gateway" label="API Gateway" /> HTTP API, routes, stages, and JWT authorizer</td>
+      <td>
+        <code>api_gateway.tf</code>
+      </td>
+      <td>
+        <Tooltip term="api-gateway" label="API Gateway" /> HTTP API, routes, stages, and JWT
+        authorizer
+      </td>
     </tr>
     <tr>
-      <td><code>cognito.tf</code></td>
-      <td><Tooltip term="cognito" label="Cognito" /> user pool, app client, groups, and default admin user</td>
+      <td>
+        <code>cognito.tf</code>
+      </td>
+      <td>
+        <Tooltip term="cognito" label="Cognito" /> user pool, app client, groups, and default admin
+        user
+      </td>
     </tr>
     <tr>
-      <td><code>amplify.tf</code></td>
-      <td><Tooltip term="amplify" label="Amplify" /> hosting app and branch for the SPA frontend</td>
+      <td>
+        <code>amplify.tf</code>
+      </td>
+      <td>
+        <Tooltip term="amplify" label="Amplify" /> hosting app and branch for the SPA frontend
+      </td>
     </tr>
     <tr>
-      <td><code>eventbridge.tf</code></td>
-      <td><Tooltip term="eventbridge" label="EventBridge" /> rule for daily scheduled ingest</td>
+      <td>
+        <code>eventbridge.tf</code>
+      </td>
+      <td>
+        <Tooltip term="eventbridge" label="EventBridge" /> rule for daily scheduled ingest
+      </td>
     </tr>
     <tr>
-      <td><code>deploy.tf</code></td>
-      <td><code>null_resource</code> that runs the web deployment script</td>
+      <td>
+        <code>deploy.tf</code>
+      </td>
+      <td>
+        <code>null_resource</code> that runs the web deployment script
+      </td>
     </tr>
     <tr>
-      <td><code>rag/</code></td>
+      <td>
+        <code>rag/</code>
+      </td>
       <td>Python source for both Lambda functions (shared library)</td>
     </tr>
     <tr>
-      <td><code>web/</code></td>
+      <td>
+        <code>web/</code>
+      </td>
       <td>Static SPA frontend served by Amplify</td>
     </tr>
     <tr>
-      <td><code>scripts/</code></td>
+      <td>
+        <code>scripts/</code>
+      </td>
       <td>Helper scripts for deployment automation</td>
     </tr>
   </tbody>
@@ -129,82 +178,157 @@ terraform-aws-s3-vectors-rag-demo/
   </thead>
   <tbody>
     <tr>
-      <td><code>aws_region</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>us-east-1</code>)</td>
+      <td>
+        <code>aws_region</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>us-east-1</code>)
+      </td>
       <td>AWS region for all resources</td>
     </tr>
     <tr>
-      <td><code>project_name</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>s3-vectors-rag</code>)</td>
+      <td>
+        <code>project_name</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>s3-vectors-rag</code>)
+      </td>
       <td>Name prefix for all resources</td>
     </tr>
     <tr>
-      <td><code>vector_bucket_name</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>rag-vectors</code>)</td>
+      <td>
+        <code>vector_bucket_name</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>rag-vectors</code>)
+      </td>
       <td>Suffix for the S3 Vectors bucket name</td>
     </tr>
     <tr>
-      <td><code>vector_index_name</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>announcements</code>)</td>
+      <td>
+        <code>vector_index_name</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>announcements</code>)
+      </td>
       <td>Name of the vector index</td>
     </tr>
     <tr>
-      <td><code>vector_dimension</code></td>
-      <td><code>number</code></td>
-      <td>No (default: <code>1024</code>)</td>
+      <td>
+        <code>vector_dimension</code>
+      </td>
+      <td>
+        <code>number</code>
+      </td>
+      <td>
+        No (default: <code>1024</code>)
+      </td>
       <td>Dimensionality of embedding vectors (1–4096)</td>
     </tr>
     <tr>
-      <td><code>vector_distance_metric</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>cosine</code>)</td>
-      <td>Distance metric: <code>cosine</code> or <code>euclidean</code></td>
+      <td>
+        <code>vector_distance_metric</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>cosine</code>)
+      </td>
+      <td>
+        Distance metric: <code>cosine</code> or <code>euclidean</code>
+      </td>
     </tr>
     <tr>
-      <td><code>embedding_model_id</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>amazon.titan-embed-text-v2:0</code>)</td>
-      <td><Tooltip term="embedding-model" label="Embedding model" /> ARN or ID</td>
+      <td>
+        <code>embedding_model_id</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>amazon.titan-embed-text-v2:0</code>)
+      </td>
+      <td>
+        <Tooltip term="embedding-model" label="Embedding model" /> ARN or ID
+      </td>
     </tr>
     <tr>
-      <td><code>inference_profile_id</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>au.anthropic.claude-sonnet-4-5-20250929-v1:0</code>)</td>
-      <td><Tooltip term="inference-profile" label="Inference profile" /> for LLM generation</td>
+      <td>
+        <code>inference_profile_id</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>au.anthropic.claude-sonnet-4-5-20250929-v1:0</code>)
+      </td>
+      <td>
+        <Tooltip term="inference-profile" label="Inference profile" /> for LLM generation
+      </td>
     </tr>
     <tr>
-      <td><code>rss_feed_urls</code></td>
-      <td><code>list(string)</code></td>
+      <td>
+        <code>rss_feed_urls</code>
+      </td>
+      <td>
+        <code>list(string)</code>
+      </td>
       <td>No</td>
       <td>List of RSS feed URLs to ingest for the corpus</td>
     </tr>
     <tr>
-      <td><code>admin_email</code></td>
-      <td><code>string</code></td>
+      <td>
+        <code>admin_email</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
       <td>Yes</td>
       <td>Email for the default Cognito admin user</td>
     </tr>
     <tr>
-      <td><code>admin_username</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>admin</code>)</td>
+      <td>
+        <code>admin_username</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>admin</code>)
+      </td>
       <td>Username for the default admin account</td>
     </tr>
     <tr>
-      <td><code>schedule_expression</code></td>
-      <td><code>string</code></td>
-      <td>No (default: <code>rate(1 day)</code>)</td>
+      <td>
+        <code>schedule_expression</code>
+      </td>
+      <td>
+        <code>string</code>
+      </td>
+      <td>
+        No (default: <code>rate(1 day)</code>)
+      </td>
       <td>EventBridge schedule for automatic ingest</td>
     </tr>
   </tbody>
 </table>
 
 <Aside type="note">
-Only <code>admin_email</code> is strictly required. All other variables have sensible defaults. Copy <code>terraform.tfvars.example</code> to get started.
+  Only <code>admin_email</code> is strictly required. All other variables have sensible defaults.
+  Copy <code>terraform.tfvars.example</code> to get started.
 </Aside>
 
 ## Terraform outputs
@@ -219,32 +343,46 @@ Only <code>admin_email</code> is strictly required. All other variables have sen
   </thead>
   <tbody>
     <tr>
-      <td><code>app_url</code></td>
+      <td>
+        <code>app_url</code>
+      </td>
       <td>Amplify HTTPS URL for the web UI</td>
       <td>Open in browser to access the briefing app</td>
     </tr>
     <tr>
-      <td><code>api_endpoint</code></td>
+      <td>
+        <code>api_endpoint</code>
+      </td>
       <td>API Gateway base URL</td>
-      <td>Base URL for API calls (<code>/query</code>, <code>/ingest</code>, <code>/status</code>)</td>
+      <td>
+        Base URL for API calls (<code>/query</code>, <code>/ingest</code>, <code>/status</code>)
+      </td>
     </tr>
     <tr>
-      <td><code>cognito_user_pool_id</code></td>
+      <td>
+        <code>cognito_user_pool_id</code>
+      </td>
       <td>Cognito user pool identifier</td>
       <td>Used for authentication configuration</td>
     </tr>
     <tr>
-      <td><code>cognito_client_id</code></td>
+      <td>
+        <code>cognito_client_id</code>
+      </td>
       <td>SPA client ID for the Cognito app client</td>
       <td>Passed to the web app for login flows</td>
     </tr>
     <tr>
-      <td><code>vector_bucket_name</code></td>
+      <td>
+        <code>vector_bucket_name</code>
+      </td>
       <td>S3 Vectors bucket name (with random prefix)</td>
       <td>Used in Lambda environment and debugging</td>
     </tr>
     <tr>
-      <td><code>ingest_function_name</code></td>
+      <td>
+        <code>ingest_function_name</code>
+      </td>
       <td>Ingest Lambda function name</td>
       <td>Manual invocation via AWS CLI</td>
     </tr>
@@ -252,7 +390,8 @@ Only <code>admin_email</code> is strictly required. All other variables have sen
 </table>
 
 <Aside type="tip">
-Run <code>terraform output</code> after apply to see all values. Use <code>terraform output -json</code> for scripted consumption.
+  Run <code>terraform output</code> after apply to see all values. Use{" "}
+  <code>terraform output -json</code> for scripted consumption.
 </Aside>
 
 ## API endpoints
@@ -270,20 +409,35 @@ The <Tooltip term="api-gateway" label="API Gateway" /> exposes three routes, all
   </thead>
   <tbody>
     <tr>
-      <td><code>POST</code></td>
-      <td><code>/query</code></td>
-      <td>Submit a question for <Tooltip term="rag" label="RAG" />-powered answer generation</td>
+      <td>
+        <code>POST</code>
+      </td>
+      <td>
+        <code>/query</code>
+      </td>
+      <td>
+        Submit a question for <Tooltip term="rag" label="RAG" />
+        -powered answer generation
+      </td>
       <td>Query Lambda</td>
     </tr>
     <tr>
-      <td><code>POST</code></td>
-      <td><code>/ingest</code></td>
+      <td>
+        <code>POST</code>
+      </td>
+      <td>
+        <code>/ingest</code>
+      </td>
       <td>Trigger a manual corpus ingest from RSS feeds</td>
       <td>Ingest Lambda</td>
     </tr>
     <tr>
-      <td><code>GET</code></td>
-      <td><code>/status</code></td>
+      <td>
+        <code>GET</code>
+      </td>
+      <td>
+        <code>/status</code>
+      </td>
       <td>Health check — returns ingest stats and index metadata</td>
       <td>Query Lambda</td>
     </tr>
@@ -291,7 +445,8 @@ The <Tooltip term="api-gateway" label="API Gateway" /> exposes three routes, all
 </table>
 
 <Aside type="note">
-All requests must include a valid JWT in the <code>Authorization</code> header. The web UI handles token refresh automatically via Cognito.
+  All requests must include a valid JWT in the <code>Authorization</code> header. The web UI handles
+  token refresh automatically via Cognito.
 </Aside>
 
 ## Lambda function details
@@ -307,28 +462,48 @@ All requests must include a valid JWT in the <code>Authorization</code> header. 
   <tbody>
     <tr>
       <td>Runtime</td>
-      <td><code>python3.12</code></td>
-      <td><code>python3.12</code></td>
+      <td>
+        <code>python3.12</code>
+      </td>
+      <td>
+        <code>python3.12</code>
+      </td>
     </tr>
     <tr>
       <td>Memory</td>
-      <td><code>512 MB</code></td>
-      <td><code>512 MB</code></td>
+      <td>
+        <code>512 MB</code>
+      </td>
+      <td>
+        <code>512 MB</code>
+      </td>
     </tr>
     <tr>
       <td>Timeout</td>
-      <td><code>300 s</code></td>
-      <td><code>60 s</code></td>
+      <td>
+        <code>300 s</code>
+      </td>
+      <td>
+        <code>60 s</code>
+      </td>
     </tr>
     <tr>
       <td>Handler</td>
-      <td><code>ingest.handler</code></td>
-      <td><code>query.handler</code></td>
+      <td>
+        <code>ingest.handler</code>
+      </td>
+      <td>
+        <code>query.handler</code>
+      </td>
     </tr>
     <tr>
       <td>Source</td>
-      <td><code>rag/ingest.py</code></td>
-      <td><code>rag/query.py</code></td>
+      <td>
+        <code>rag/ingest.py</code>
+      </td>
+      <td>
+        <code>rag/query.py</code>
+      </td>
     </tr>
     <tr>
       <td>Trigger</td>
@@ -352,32 +527,48 @@ Both <Tooltip term="lambda" label="Lambda" /> functions receive configuration vi
   </thead>
   <tbody>
     <tr>
-      <td><code>VECTOR_BUCKET_NAME</code></td>
+      <td>
+        <code>VECTOR_BUCKET_NAME</code>
+      </td>
       <td>Both</td>
       <td>S3 Vectors bucket name for API calls</td>
     </tr>
     <tr>
-      <td><code>VECTOR_INDEX_NAME</code></td>
+      <td>
+        <code>VECTOR_INDEX_NAME</code>
+      </td>
       <td>Both</td>
       <td>Vector index name within the bucket</td>
     </tr>
     <tr>
-      <td><code>EMBEDDING_MODEL_ID</code></td>
+      <td>
+        <code>EMBEDDING_MODEL_ID</code>
+      </td>
       <td>Both</td>
-      <td><Tooltip term="titan-v2" label="Titan V2" /> model ID for embedding generation</td>
+      <td>
+        <Tooltip term="titan-v2" label="Titan V2" /> model ID for embedding generation
+      </td>
     </tr>
     <tr>
-      <td><code>INFERENCE_PROFILE_ID</code></td>
+      <td>
+        <code>INFERENCE_PROFILE_ID</code>
+      </td>
       <td>Query</td>
-      <td><Tooltip term="inference-profile" label="Inference profile" /> for LLM answer generation</td>
+      <td>
+        <Tooltip term="inference-profile" label="Inference profile" /> for LLM answer generation
+      </td>
     </tr>
     <tr>
-      <td><code>DOCUMENT_BUCKET_NAME</code></td>
+      <td>
+        <code>DOCUMENT_BUCKET_NAME</code>
+      </td>
       <td>Ingest</td>
       <td>S3 bucket for storing raw fetched documents</td>
     </tr>
     <tr>
-      <td><code>RSS_FEED_URLS</code></td>
+      <td>
+        <code>RSS_FEED_URLS</code>
+      </td>
       <td>Ingest</td>
       <td>Comma-separated list of RSS feed URLs to fetch</td>
     </tr>

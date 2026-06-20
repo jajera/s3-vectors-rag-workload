@@ -3,8 +3,8 @@ title: Embedding Strategy
 description: How text becomes vectors — model choice, document preparation, and the single-chunk approach.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 This page explains how the pipeline converts text into vectors using <Tooltip term="titan-v2" label="Amazon Titan Embeddings V2" /> — covering model selection, document preparation, truncation handling, and why each article becomes a single vector rather than multiple chunks.
 
@@ -22,7 +22,9 @@ The project uses <Tooltip term="embedding-model" label="Amazon Titan Text Embedd
   <tbody>
     <tr>
       <td>Model ID</td>
-      <td><code>amazon.titan-embed-text-v2:0</code></td>
+      <td>
+        <code>amazon.titan-embed-text-v2:0</code>
+      </td>
     </tr>
     <tr>
       <td>Output dimensions</td>
@@ -34,11 +36,15 @@ The project uses <Tooltip term="embedding-model" label="Amazon Titan Text Embedd
     </tr>
     <tr>
       <td>Distance metric</td>
-      <td><Tooltip term="cosine" label="Cosine similarity" /></td>
+      <td>
+        <Tooltip term="cosine" label="Cosine similarity" />
+      </td>
     </tr>
     <tr>
       <td>Access</td>
-      <td>Amazon <Tooltip term="bedrock" label="Bedrock" /> runtime API</td>
+      <td>
+        Amazon <Tooltip term="bedrock" label="Bedrock" /> runtime API
+      </td>
     </tr>
   </tbody>
 </table>
@@ -66,7 +72,9 @@ def _truncate_body(text: str) -> str:
 ```
 
 <Aside type="note">
-The 8000-character limit is a practical safety margin below Titan V2's 8192-token maximum. Characters and tokens aren't 1:1, but for ASCII English text after normalization the ratio is close enough that 8000 characters stays safely within the token budget.
+  The 8000-character limit is a practical safety margin below Titan V2's 8192-token maximum.
+  Characters and tokens aren't 1:1, but for ASCII English text after normalization the ratio is
+  close enough that 8000 characters stays safely within the token budget.
 </Aside>
 
 ## Single-chunk rationale
@@ -81,7 +89,8 @@ Why this works here:
 - **Demo clarity** — Fewer moving parts make the architecture easier to understand and debug.
 
 <Aside type="tip">
-For production systems with longer documents (PDFs, technical manuals), chunking with overlap is usually necessary to stay within token limits and improve retrieval precision.
+  For production systems with longer documents (PDFs, technical manuals), chunking with overlap is
+  usually necessary to stay within token limits and improve retrieval precision.
 </Aside>
 
 ## The embedding function
@@ -154,7 +163,9 @@ Both paths use the same model ID (`amazon.titan-embed-text-v2:0`) configured via
     <tr>
       <td>Ingest</td>
       <td>Cleaned article body (up to 8000 chars)</td>
-      <td>Store vector in <Tooltip term="s3-vectors" label="S3 Vectors" /> index</td>
+      <td>
+        Store vector in <Tooltip term="s3-vectors" label="S3 Vectors" /> index
+      </td>
     </tr>
     <tr>
       <td>Query</td>
@@ -165,6 +176,6 @@ Both paths use the same model ID (`amazon.titan-embed-text-v2:0`) configured via
 </table>
 
 <Aside type="caution">
-If you change the embedding model, you must re-ingest the entire corpus. Vectors from different models are not comparable — similarity scores become meaningless.
+  If you change the embedding model, you must re-ingest the entire corpus. Vectors from different
+  models are not comparable — similarity scores become meaningless.
 </Aside>
-

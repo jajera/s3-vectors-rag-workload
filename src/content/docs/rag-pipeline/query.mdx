@@ -3,8 +3,8 @@ title: Query Pipeline
 description: How questions become answers — embedding, search, reranking, and LLM generation.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-import Tooltip from '@/components/Tooltip.astro';
+import { Aside } from "@astrojs/starlight/components";
+import Tooltip from "@/components/Tooltip.astro";
 
 The query pipeline transforms a user question into a structured, sourced answer. It embeds the question, searches <Tooltip term="s3-vectors" label="S3 Vectors" /> for similar documents, reranks results using similarity and recency, builds a context window, and generates a response with <Tooltip term="bedrock" label="Bedrock" />.
 
@@ -46,7 +46,11 @@ The function detects two patterns:
 - **Time-windowed queries** (e.g., "last 2 weeks") — bumps to at least 6 results
 - **Broad queries** (e.g., "summarize recent updates") — bumps to at least 5 results
 
-<Aside type="tip">The actual retrieval fetches `desired_top_k × RETRIEVAL_MULTIPLIER` vectors (capped at 20). This over-fetch ensures the reranking stage has enough candidates to choose from after filtering and deduplication.</Aside>
+<Aside type="tip">
+  The actual retrieval fetches `desired_top_k × RETRIEVAL_MULTIPLIER` vectors (capped at 20). This
+  over-fetch ensures the reranking stage has enough candidates to choose from after filtering and
+  deduplication.
+</Aside>
 
 ## Over-Fetch and Filter
 
@@ -91,7 +95,10 @@ The final score formula:
 final_score = (0.8 × similarity) + (0.2 × recency_score)
 ```
 
-<Aside type="note">Documents with no publish date receive a default recency score of 0.25 — roughly equivalent to a 42-day-old article. This prevents undated documents from being unfairly penalized or boosted.</Aside>
+<Aside type="note">
+  Documents with no publish date receive a default recency score of 0.25 — roughly equivalent to a
+  42-day-old article. This prevents undated documents from being unfairly penalized or boosted.
+</Aside>
 
 Candidates are sorted by final score descending, then the top `desired_top_k` are selected.
 
@@ -144,7 +151,11 @@ def _build_context(candidates, max_chars=MAX_CONTEXT_CHARS):
 
 Each source is numbered `[1]`, `[2]`, etc., so the LLM can cite them in its response. The context is capped at 8,000 characters to stay within prompt budget.
 
-<Aside type="caution">If no candidates survive filtering (empty result set), the pipeline returns a structured fallback message explaining that no matching announcements were found — it never sends an empty context to the LLM.</Aside>
+<Aside type="caution">
+  If no candidates survive filtering (empty result set), the pipeline returns a structured fallback
+  message explaining that no matching announcements were found — it never sends an empty context to
+  the LLM.
+</Aside>
 
 ## LLM Generation
 
@@ -208,7 +219,11 @@ def ask(config: Config, question: str, top_k: int = 3) -> QueryResult:
     return QueryResult(question=question, answer=answer, sources=sources)
 ```
 
-<Aside type="tip">The <code>ask()</code> function is invoked by the Query Lambda handler. The Lambda receives a JWT-authenticated request via API Gateway, extracts the question, calls <code>ask()</code>, and returns the structured response.</Aside>
+<Aside type="tip">
+  The <code>ask()</code> function is invoked by the Query Lambda handler. The Lambda receives a
+  JWT-authenticated request via API Gateway, extracts the question, calls <code>ask()</code>, and
+  returns the structured response.
+</Aside>
 
 ## Pipeline Parameters
 
@@ -222,27 +237,37 @@ def ask(config: Config, question: str, top_k: int = 3) -> QueryResult:
   </thead>
   <tbody>
     <tr>
-      <td><code>MIN_TOP_K</code></td>
+      <td>
+        <code>MIN_TOP_K</code>
+      </td>
       <td>3</td>
       <td>Minimum number of sources in final answer</td>
     </tr>
     <tr>
-      <td><code>MAX_TOP_K</code></td>
+      <td>
+        <code>MAX_TOP_K</code>
+      </td>
       <td>8</td>
       <td>Maximum sources regardless of query type</td>
     </tr>
     <tr>
-      <td><code>RETRIEVAL_MULTIPLIER</code></td>
+      <td>
+        <code>RETRIEVAL_MULTIPLIER</code>
+      </td>
       <td>3</td>
       <td>Over-fetch factor (retrieve 3× desired)</td>
     </tr>
     <tr>
-      <td><code>MAX_CONTEXT_CHARS</code></td>
+      <td>
+        <code>MAX_CONTEXT_CHARS</code>
+      </td>
       <td>8,000</td>
       <td>Maximum context window size for LLM prompt</td>
     </tr>
     <tr>
-      <td><code>RECENCY_HALF_LIFE_DAYS</code></td>
+      <td>
+        <code>RECENCY_HALF_LIFE_DAYS</code>
+      </td>
       <td>30</td>
       <td>Exponential decay half-life for recency scoring</td>
     </tr>
@@ -252,7 +277,9 @@ def ask(config: Config, question: str, top_k: int = 3) -> QueryResult:
       <td>Character budget per document snippet</td>
     </tr>
     <tr>
-      <td><code>max_tokens</code></td>
+      <td>
+        <code>max_tokens</code>
+      </td>
       <td>1,024</td>
       <td>Maximum LLM response length</td>
     </tr>
