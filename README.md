@@ -24,7 +24,7 @@ Use Node 22 (see .nvmrc).
     npm install
     npm run dev
 
-Open http://localhost:4321/s3-vectors-rag-workload/
+Open http://localhost:4321/
 
     npm run build   # production build (draft pages excluded)
     npm run preview # serve the build locally
