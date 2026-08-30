@@ -11,6 +11,9 @@ export default defineConfig({
   },
   integrations: [
     starlight({
+      components: {
+        Head: "./src/components/Head.astro",
+      },
       title: "Amazon S3 Vectors RAG",
       favicon: "/favicon.svg",
       description:
